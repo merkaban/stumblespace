@@ -1,0 +1,786 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/>
+<title>Zettelkasten — H · halo with show-all toggle</title>
+<style>
+  :root{
+    --bg:#1e1e24;--bg2:#252530;--panel:#2a2a36;--line:#36364a;
+    --ink:#e6e6f0;--ink2:#9a9ab0;--ink3:#6b6b82;
+    --violet:#a57bff;--amber:#f5b544;--gray:#8a8aa0;
+    --font:"Iosevka","JetBrains Mono",ui-monospace,Menlo,monospace;
+    --ui:"Inter",-apple-system,system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:var(--ui);font-size:13px;overflow:hidden}
+  .app{display:flex;flex-direction:column;height:100vh}
+  .titlebar{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--bg2);flex-shrink:0}
+  .titlebar .dot{width:10px;height:10px;border-radius:50%;background:var(--violet);box-shadow:0 0 12px var(--violet)}
+  .titlebar h1{margin:0;font-size:13px;font-weight:600}
+  .titlebar .path{font-family:var(--font);color:var(--ink2);font-size:12px}
+  .titlebar .path b{color:var(--ink)}
+  .titlebar .spacer{flex:1}
+  .titlebar .mode{font-family:var(--font);font-size:11px;color:var(--ink3);text-transform:uppercase;letter-spacing:.15em}
+  .titlebar .variant{font-family:var(--font);font-size:11px;color:var(--amber);text-transform:uppercase;letter-spacing:.16em;padding:3px 9px;border:1px solid color-mix(in srgb,var(--amber) 40%,var(--line));border-radius:4px}
+
+  .filterbar{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--bg2);flex-wrap:wrap;flex-shrink:0}
+  .chip{display:inline-flex;align-items:center;gap:7px;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:#22222c;cursor:pointer;user-select:none;font-size:12px;color:var(--ink);transition:all .15s}
+  .chip .sw{width:9px;height:9px;border-radius:50%}
+  .chip.off{color:var(--ink3);background:transparent}
+  .chip.off .sw{opacity:.25}
+  .chip.locked{cursor:default;border-color:color-mix(in srgb,var(--violet) 50%,var(--line));background:color-mix(in srgb,var(--violet) 14%,transparent)}
+  .chip .count{color:var(--ink3);font-family:var(--font);font-size:10.5px;margin-left:2px}
+  .divider{width:1px;height:20px;background:var(--line);margin:0 4px}
+  .filterbar .legend{margin-left:auto;font-family:var(--font);font-size:10.5px;color:var(--ink3);letter-spacing:.06em}
+  .filterbar .legend b{color:var(--amber);font-weight:500}
+
+  .canvas-wrap{flex:1;position:relative;overflow:hidden;
+    background:radial-gradient(1100px 700px at 50% 50%, #242432 0%, #1c1c24 55%, #15151c 100%)}
+  .grain{position:absolute;inset:0;pointer-events:none;opacity:.035;
+    background-image:radial-gradient(#fff 1px,transparent 1px);background-size:3px 3px}
+
+  svg.edges{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+  svg.edges path,svg.edges line{transition:all .5s cubic-bezier(.65,.05,.36,1)}
+
+  .node{position:absolute;z-index:2;transform:translate(-50%,-50%);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 11px;min-width:140px;max-width:200px;box-shadow:0 8px 24px rgba(0,0,0,.35);cursor:pointer;
+    transition:left .5s cubic-bezier(.65,.05,.36,1),top .5s cubic-bezier(.65,.05,.36,1),opacity .35s,transform .15s,border-color .15s}
+  .node:hover{border-color:#5a5a75;z-index:50}
+  .node:hover .title{color:#fff}
+  .node .id{font-family:var(--font);font-size:10.5px;color:var(--ink3);letter-spacing:.04em}
+  .node .title{font-size:12.5px;font-weight:500;line-height:1.35;margin-top:2px;color:var(--ink)}
+
+  .node.spine{border-color:color-mix(in srgb,var(--violet) 55%,var(--line));box-shadow:0 0 0 1px color-mix(in srgb,var(--violet) 25%,transparent),0 10px 28px rgba(0,0,0,.4)}
+  .node.spine .id{color:color-mix(in srgb,var(--violet) 85%,var(--ink2))}
+  .node.current{background:linear-gradient(180deg,#3a2a5e,#2a2238);border-color:var(--violet);box-shadow:0 0 0 2px color-mix(in srgb,var(--violet) 55%,transparent),0 12px 34px rgba(165,123,255,.25);cursor:default}
+  .node.current .title{color:#fff}
+  .node.dim{opacity:.65}
+
+  .node .leafbadge{position:absolute;top:-7px;right:-7px;font-family:var(--font);font-size:8.5px;padding:1px 6px;background:#2a2a36;border:1px solid var(--line);border-radius:3px;color:var(--ink3);letter-spacing:.08em;text-transform:uppercase;pointer-events:none}
+  .node.leaf.has-children .leafbadge{color:color-mix(in srgb,var(--violet) 80%,var(--ink2));border-color:color-mix(in srgb,var(--violet) 40%,var(--line))}
+
+  /* untyped: direction encodes outgoing / incoming / mutual */
+  .node.leaf{background:var(--panel);border:1px solid var(--line)}
+
+  /* OUTGOING — current claims this connection. Subtle amber accent stripe. */
+  .node.leaf.dir-out{border-left:3px solid var(--amber)}
+
+  /* INCOMING — someone else points here. Dashed outline, no fill. */
+  .node.leaf.dir-in{
+    background:rgba(245,181,68,.03);
+    border:1px dashed color-mix(in srgb,var(--amber) 65%,var(--line));
+  }
+
+  /* MUTUAL — both notes acknowledge. Amber wash + glow, strongest visual presence. */
+  .node.leaf.dir-mutual{
+    background:linear-gradient(180deg,color-mix(in srgb,var(--amber) 12%,var(--panel)),var(--panel));
+    border:1px solid color-mix(in srgb,var(--amber) 75%,var(--line));
+    box-shadow:
+      0 0 0 1px color-mix(in srgb,var(--amber) 30%,transparent),
+      0 0 14px color-mix(in srgb,var(--amber) 22%,transparent),
+      0 10px 24px rgba(0,0,0,.4);
+  }
+  .node.leaf.dir-mutual .id{color:color-mix(in srgb,var(--amber) 70%,var(--ink2))}
+
+  /* legend swatches — miniature versions of the three states */
+  .lgbox{display:inline-block;width:24px;height:13px;border-radius:3px;margin-right:5px;vertical-align:-2px;background:var(--panel);border:1px solid var(--line)}
+  .lgbox.lg-out{border-left:3px solid var(--amber)}
+  .lgbox.lg-in{background:rgba(245,181,68,.04);border:1px dashed color-mix(in srgb,var(--amber) 65%,var(--line))}
+  .lgbox.lg-mutual{background:linear-gradient(180deg,color-mix(in srgb,var(--amber) 12%,var(--panel)),var(--panel));border:1px solid color-mix(in srgb,var(--amber) 75%,var(--line));box-shadow:0 0 0 1px color-mix(in srgb,var(--amber) 30%,transparent),0 0 6px color-mix(in srgb,var(--amber) 22%,transparent)}
+  .legend .sep{color:var(--ink3);margin:0 6px}
+
+  /* legend entries dim when their direction is hidden by the show-all toggle */
+  .lg-entry{display:inline-flex;align-items:center;transition:opacity .2s}
+  .lg-entry.dim{opacity:.28}
+
+  /* setting toggle — represents what will live in the plugin's settings tab.
+     Styled as a chip-shaped pill but visually distinct from the locked filter chips:
+     no colored swatch, slightly muted, with an explicit ON/OFF state suffix. */
+  .setting-pill{display:inline-flex;align-items:center;gap:8px;padding:5px 11px;border-radius:999px;
+    border:1px dashed var(--line);background:transparent;cursor:pointer;user-select:none;
+    font-size:11.5px;color:var(--ink2);font-family:var(--font);letter-spacing:.04em;
+    transition:border-color .15s,color .15s,background .15s}
+  .setting-pill:hover{border-color:#5a5a75;color:var(--ink)}
+  .setting-pill .gear{font-size:10px;color:var(--ink3)}
+  .setting-pill .state{font-weight:600;font-size:10.5px;letter-spacing:.1em;padding:1px 6px;border-radius:3px}
+  .setting-pill.on .state{color:#4fd08a;background:rgba(79,208,138,.1)}
+  .setting-pill.off .state{color:var(--ink3);background:rgba(140,140,160,.1)}
+
+  .hint{position:absolute;left:16px;bottom:14px;font-family:var(--font);font-size:11px;color:var(--ink3);line-height:1.6;background:rgba(20,20,28,.65);border:1px solid var(--line);border-radius:6px;padding:8px 11px;backdrop-filter:blur(6px);max-width:340px}
+  .hint b{color:var(--ink2);font-weight:600}
+  .hint .k{color:var(--violet)}
+  .hint .a{color:var(--amber)}
+
+  .backbtn{position:absolute;right:16px;bottom:14px;font-family:var(--font);font-size:11px;color:var(--ink2);background:rgba(20,20,28,.7);border:1px solid var(--line);border-radius:6px;padding:7px 11px;cursor:pointer;backdrop-filter:blur(6px)}
+  .backbtn:hover{border-color:var(--violet);color:var(--ink)}
+  .backbtn.hidden{opacity:0;pointer-events:none}
+  .expandbtn{position:absolute;top:-9px;right:-9px;width:20px;height:20px;border-radius:50%;background:var(--violet);color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 0 12px color-mix(in srgb,var(--violet) 60%,transparent);border:0;line-height:1;z-index:60}
+  .expandbtn:hover{transform:scale(1.1)}
+  .focuscard{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:440px;max-width:80vw;background:#22222e;border:1px solid var(--violet);border-radius:10px;box-shadow:0 30px 80px rgba(0,0,0,.65),0 0 0 1px color-mix(in srgb,var(--violet) 35%,transparent);padding:22px 24px 20px;z-index:100;backdrop-filter:blur(10px)}
+  .focuscard .fc-id{font-family:var(--font);font-size:11px;color:color-mix(in srgb,var(--violet) 80%,var(--ink2));letter-spacing:.05em}
+  .focuscard h2{margin:4px 0 14px;font-size:18px;font-weight:600;letter-spacing:-.01em}
+  .focuscard .fc-body{font-size:12.5px;line-height:1.6;color:var(--ink2);font-family:var(--ui)}
+  .focuscard .fc-body p{margin:0 0 10px}
+  .focuscard .fc-srch{margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
+  .focuscard .fc-srch .lbl{font-family:var(--font);font-size:9.5px;text-transform:uppercase;letter-spacing:.16em;color:var(--gray);margin-bottom:8px}
+  .focuscard .fc-srch .src{display:flex;align-items:baseline;gap:8px;padding:6px 8px;border-left:3px solid var(--gray);background:#1c1c26;margin-bottom:5px;cursor:pointer;border-radius:0 4px 4px 0}
+  .focuscard .fc-srch .src:hover{background:#262633}
+  .focuscard .fc-srch .src .sid{font-family:var(--font);font-size:10.5px;color:var(--ink3)}
+  .focuscard .fc-srch .src .stt{font-size:12px;color:var(--ink)}
+  .focuscard .fc-srch .nosrc{font-size:11.5px;color:var(--ink3);font-style:italic}
+  .focuscard .fc-close{position:absolute;top:10px;right:12px;background:transparent;border:0;color:var(--ink3);font-size:18px;cursor:pointer;line-height:1}
+  .focuscard .fc-close:hover{color:var(--ink)}
+  .node.kb-focus{z-index:50}
+  .node.kb-focus::before{content:"";position:absolute;inset:-6px;border-radius:11px;border:1.5px dashed var(--ink);opacity:.75;pointer-events:none;animation:kbpulse 1.6s ease-in-out infinite}
+  @keyframes kbpulse{0%,100%{opacity:.45}50%{opacity:.9}}
+  .kbhelp{position:absolute;bottom:18px;right:18px;font-family:var(--font);font-size:10.5px;color:var(--ink3);background:#22222c;border:1px solid var(--line);border-radius:6px;padding:8px 11px;line-height:1.75;pointer-events:none;z-index:40}
+  .kbhelp b{color:var(--ink2);font-weight:600}
+  .scrim{position:absolute;inset:0;background:rgba(15,15,20,.55);z-index:90;backdrop-filter:blur(2px)}
+</style></head>
+<body>
+<div class="app">
+  <div class="titlebar">
+    <div class="dot"></div>
+    <h1>Zettelkasten</h1>
+    <span class="path">› grouped halo › <b id="currentLabel">22a3 Why rediscovery matters</b></span>
+    <div class="spacer"></div>
+    <div class="variant">H · show-all toggle</div>
+    <div class="mode">setting preview · click chip below</div>
+  </div>
+
+  <div class="filterbar">
+    <div class="chip locked"><span class="sw" style="background:var(--violet)"></span>folgezettel</div>
+    <div class="chip locked"><span class="sw" style="background:var(--amber)"></span>references <span class="count" id="refCount">0</span></div>
+    <div class="legend" id="legend">
+      arc, left → right:
+      <span class="lg-entry" id="lg-out"><span class="lgbox lg-out"></span>outgoing</span>
+      <span class="sep">·</span>
+      <span class="lg-entry" id="lg-mutual"><span class="lgbox lg-mutual"></span>mutual</span>
+      <span class="sep">·</span>
+      <span class="lg-entry" id="lg-in"><span class="lgbox lg-in"></span>incoming</span>
+    </div>
+    <button class="setting-pill on" id="settingPill" title="Preview of what will be a setting in the plugin's settings tab">
+      <span class="gear">⚙</span>
+      <span>show incoming + mutual</span>
+      <span class="state" id="settingState">ON</span>
+    </button>
+  </div>
+
+  <div class="canvas-wrap" id="canvas">
+    <div class="grain"></div>
+    <svg class="edges" id="edges"></svg>
+    <div class="hint">
+      <b>grouped halo</b> · arc clusters by direction (proportional)<br>
+      outgoing first · mutual middle · incoming last (L→R)<br>
+      <b id="countLabel">—</b>
+    </div>
+    <button class="backbtn hidden" id="backbtn">← back</button>
+    <div class="kbhelp"><b>↑↓←→</b> move focus · <b>Enter</b> recenter<br><b>F</b> focus card · <b>Backspace</b> back · <b>Esc</b> close</div>
+  </div>
+</div>
+
+<script>
+// ============ VAULT ============
+const vault = {
+  notes: {
+    "22":      "Note-taking systems",
+    "22a":     "Luhmann's Zettelkasten",
+    "22a1":    "Numeric branching origin",
+    "22a2":    "Numeric branching IDs",
+    "22a3":    "Why rediscovery matters",
+    "22a3a":   "Serendipity in filing",
+    "22a3a1":  "Physical browsing as retrieval",
+    "22a3b":   "Dead-end notes are fine",
+    "22a3b1":  "Stub notes as seeds",
+    "22a3c":   "Compounding with age",
+    "22a4":    "Digital Folgezettel",
+    "22b":     "Commonplace books",
+    "22b1":    "Marginalia tradition",
+    "31":      "Information retrieval",
+    "31a":     "Query languages",
+    "31b":     "Cognitive cost of search",
+    "31b1":    "Query fatigue",
+    "31b2":    "Recognition vs recall in PKM",
+    "44":      "Cybernetics",
+    "44c":     "Bush's Memex",
+    "44c1":    "Associative trails",
+    "57":      "Search-first PKM",
+    "57a":     "Search replaces browsing",
+    "08f":     "Anti-library (Taleb)",
+    "12d":     "Index cards in humanities",
+    "12d2":    "Barthes' fichier",
+    "22a5":    "Branching width vs depth",
+    "22a6":    "When IDs run out of letters",
+    "99":      "Sources",
+    "99a":     "Ahrens · How to Take Smart Notes",
+    "99b":     "Schmidt · Luhmann's archive",
+    "99c":     "Bush · As We May Think (1945)"
+  },
+  // All non-source links collapse to "see-also" — the typing is gone.
+  // Source links stay distinguished because they belong in the focus card, not the canvas.
+  links: [
+    ["22a3","see-also","31b"],
+    ["22a3","see-also","44c"],
+    ["22a3","see-also","57a"],
+    ["22a3","see-also","08f"],
+    ["22a3","see-also","12d"],
+    ["22a3a","see-also","31b2"],
+    ["22a3b","see-also","44c1"],
+    ["22a4","see-also","31a"],
+    ["22a","see-also","22b"],
+    ["22b","see-also","12d"],
+    ["31b","see-also","57a"],
+    ["31b","see-also","31"],
+    ["44c","see-also","31b"],
+    ["44c","source","08f"],
+    ["12d","see-also","22b"],
+    ["31b2","see-also","31b"],
+    ["22a3c","see-also","08f"],
+    ["22a3","see-also","31"],
+    ["22a3","see-also","31b1"],
+    ["22a3","see-also","31a"],
+    ["22a3","see-also","22b"],
+    ["22a3","see-also","12d2"],
+    ["22a3","see-also","57"],
+    ["22a3","source","99a"],
+    ["22a3","source","99b"],
+    ["22a","source","99a"],
+    ["44c","source","99c"],
+    ["31b","source","99a"],
+    // ===== ADDED for direction-demo: 22a3 should display all 3 states =====
+    // Mutual examples — 22a3 already links OUT to these; here they link BACK:
+    ["31b","see-also","22a3"],     // 22a3 ↔ 31b → MUTUAL
+    ["44c","see-also","22a3"],     // 22a3 ↔ 44c → MUTUAL
+    // Incoming-only examples — these notes link to 22a3 with no reciprocal:
+    ["31b2","see-also","22a3"],    // 31b2 → 22a3 only → INCOMING
+    ["44c1","see-also","22a3"]     // 44c1 → 22a3 only → INCOMING
+  ]
+};
+
+// ============ FOLGEZETTEL PARSING ============
+function parseFz(id){
+  if(id.includes(".")) return id.split(".");
+  const out=[]; let buf="", mode=null;
+  for(const ch of id){
+    const isD=/\d/.test(ch);
+    const m=isD?"d":"a";
+    if(mode===null){mode=m;buf=ch;continue}
+    if(m===mode){buf+=ch} else {out.push(buf);buf=ch;mode=m}
+  }
+  if(buf) out.push(buf);
+  return out;
+}
+function fzParent(id){
+  const p=parseFz(id);
+  if(p.length<=1) return null;
+  return p.slice(0,-1).join("");
+}
+function fzAncestors(id){
+  const out=[]; let cur=id;
+  while(true){const p=fzParent(cur); if(!p||!vault.notes[p])break; out.push(p); cur=p}
+  return out;
+}
+function fzChildren(id){
+  const depth=parseFz(id).length;
+  return Object.keys(vault.notes).filter(k=>{
+    const pp=parseFz(k);
+    if(pp.length!==depth+1) return false;
+    return k.startsWith(id) && fzParent(k)===id;
+  }).sort();
+}
+function fzHasChildren(id){ return fzChildren(id).length>0 }
+function fzSiblings(id){
+  const p=fzParent(id); if(!p) return [];
+  return fzChildren(p).filter(k=>k!==id);
+}
+
+// ============ SEMANTIC ============
+// Returns references with direction encoded.
+// dir ∈ {"out","in","mutual"}:
+//   out    — current → other (outgoing only)
+//   in     — other → current (incoming only)
+//   mutual — both directions present
+// Folgezettel relatives (ancestors/descendants/siblings/self) are ALWAYS excluded
+// from the halo regardless of any link between them — they live on the spine.
+function semanticNeighbors(id){
+  const outgoing = new Set();
+  const incoming = new Set();
+  for(const [a,t,b] of vault.links){
+    if(t==="source") continue;
+    if(a===id) outgoing.add(b);
+    if(b===id) incoming.add(a);
+  }
+  const all = new Set([...outgoing, ...incoming]);
+  const out = [];
+  for(const nid of all){
+    if(!vault.notes[nid]) continue;             // unresolved → would be ghost; skip in this prototype
+    if(isFolgezettelRelative(id, nid)) continue;// spine excludes halo
+    let dir;
+    if(outgoing.has(nid) && incoming.has(nid)) dir = "mutual";
+    else if(outgoing.has(nid))                  dir = "out";
+    else                                         dir = "in";
+    out.push({id: nid, dir});
+  }
+  return out;
+}
+
+// Is otherId an ancestor, descendant, sibling, or self of currentId?
+// Used to keep halo placement and spine placement strictly disjoint.
+function isFolgezettelRelative(currentId, otherId){
+  if(currentId === otherId) return true;
+  const cur = parseFz(currentId);
+  const oth = parseFz(otherId);
+  // Ancestor or descendant: one's parsed array is a prefix of the other's
+  const minLen = Math.min(cur.length, oth.length);
+  let isPrefix = true;
+  for(let i=0; i<minLen; i++){
+    if(cur[i] !== oth[i]){ isPrefix = false; break }
+  }
+  if(isPrefix) return true;
+  // Sibling: same direct parent
+  const cp = fzParent(currentId);
+  const op = fzParent(otherId);
+  return cp !== null && cp === op;
+}
+
+// Cheap stable hash for deterministic angle assignment
+function hashId(id){
+  let h = 2166136261;
+  for(let i=0;i<id.length;i++){ h ^= id.charCodeAt(i); h = Math.imul(h, 16777619) }
+  return (h >>> 0) / 4294967296; // 0..1
+}
+
+// ============ STATE ============
+let current = "22a3";
+let history = [];
+const filters = new Set(["references"]);
+let kbFocus = null;
+let lastPositions = {};
+
+// SETTING PREVIEW: when false, the halo hides incoming-only references
+// and demotes mutuals to plain outgoing. In the plugin this lives in the
+// settings tab; in this prototype it's wired to the "setting-pill" button.
+let showAll = true;
+
+// View-layer transform: applies the showAll setting to raw semantic data.
+// Centralized so layout() and renderEdges() stay consistent.
+function effectiveSemantics(id){
+  let semantics = semanticNeighbors(id);
+  if(!showAll){
+    semantics = semantics
+      .filter(n => n.dir !== "in")
+      .map(n => n.dir === "mutual" ? {id: n.id, dir: "out"} : n);
+  }
+  return semantics;
+}
+
+// ============ LAYOUT ============
+function layout(id){
+  const positions = {};
+  positions[id]={x:50,y:50,cls:"current",role:"current"};
+
+  // Ancestors: straight vertical above. Capped at the nearest 2 — if there are
+  // more, renderEdges() draws a short dashed line above the topmost shown ancestor
+  // to indicate continuation. This keeps the spine column from extending into the
+  // upper-arc territory where references live.
+  const ancs = fzAncestors(id);
+  ancs.slice(0, 2).forEach((a,i)=>{
+    const y = 50 - (i+1)*11;
+    positions[a]={x:50,y,cls:"spine",role:"ancestor"};
+  });
+
+  // Siblings
+  const sibs = fzSiblings(id);
+  sibs.forEach((s,i)=>{
+    const offset = (i%2===0?-1:1) * (14 + Math.floor(i/2)*8);
+    positions[s]={x:50+offset,y:50,cls:"spine dim",role:"sibling"};
+  });
+
+  // Children fan
+  const kids = fzChildren(id);
+  const kidCount = kids.length;
+  const kidY = 68;
+  kids.forEach((k,i)=>{
+    let x;
+    if(kidCount===1) x=50;
+    else if(kidCount===2) x=50 + (i===0?-12:12);
+    else {
+      const span = Math.min(42, 14*(kidCount-1));
+      x = 50 - span/2 + (span/(kidCount-1))*i;
+    }
+    positions[k]={x,y:kidY,cls:"spine",role:"child"};
+  });
+
+  // Grandchildren
+  if(kidCount<=2){
+    kids.forEach(k=>{
+      const gks = fzChildren(k);
+      gks.forEach((gk,i)=>{
+        const px = positions[k].x;
+        const x = px + (gks.length===1?0:(i-(gks.length-1)/2)*7);
+        positions[gk]={x,y:94,cls:"spine dim",role:"grandchild"};
+      });
+    });
+  }
+
+  // ============ VARIANT F: DIRECTIONAL HALO, GROUPED ============
+  // Same arc geometry as variant E (10° dead zone at 270°, arcs [195°,265°] and [275°,345°]).
+  // Now neighbors are grouped by direction along the arc, left-to-right:
+  //   outgoing → mutual → incoming
+  // The arc is walked in order from 195° (9:30) through the gap to 345° (2:30), so
+  // the FIRST item in the sorted array sits leftmost. Within each direction-group,
+  // notes are alphabetically ordered for stability.
+  const ARCS = [[195, 265], [275, 345]];
+  const semantics = effectiveSemantics(id).filter(n => !positions[n.id]);
+  const dirOrder = {out: 0, mutual: 1, in: 2};
+  const sorted = [...semantics].sort((a,b) => {
+    const da = dirOrder[a.dir], db = dirOrder[b.dir];
+    if(da !== db) return da - db;
+    return a.id.localeCompare(b.id);
+  });
+  const N = sorted.length;
+  if(N>0){
+    const totalDeg = ARCS.reduce((s,[a0,a1])=>s+(a1-a0), 0);
+    sorted.forEach((n,i)=>{
+      const t01 = (i + 0.5) / N;
+      let target = t01 * totalDeg;
+      let ang = ARCS[0][0];
+      for(const [a0,a1] of ARCS){
+        const w = a1-a0;
+        if(target <= w){ ang = a0 + target; break }
+        target -= w;
+      }
+      const a = ang * Math.PI/180;
+      const rOff = (i%2===1) ? 5 : 0;
+      const x = 50 + Math.cos(a) * (40 + rOff);
+      const y = 50 + Math.sin(a) * (37 + rOff);
+      positions[n.id]={x,y,cls:"leaf",role:"semantic",dir:n.dir};
+    });
+  }
+
+  return positions;
+}
+
+// ============ RENDER ============
+const canvas = document.getElementById("canvas");
+const edgesSvg = document.getElementById("edges");
+let nodeEls = {};
+
+function render(animated=true){
+  const pos = layout(current);
+  lastPositions = pos;
+  if(!kbFocus || !pos[kbFocus]) kbFocus = current;
+  const visibleIds = new Set(Object.keys(pos));
+
+  for(const id of visibleIds){
+    const p = pos[id];
+    let el = nodeEls[id];
+    if(!el){
+      el = document.createElement("div");
+      el.className = "node";
+      el.innerHTML = `<div class="id"></div><div class="title"></div><div class="leafbadge"></div>`;
+      canvas.appendChild(el);
+      nodeEls[id] = el;
+      el.style.left = "50%";
+      el.style.top = "50%";
+      el.style.opacity = "0";
+    }
+    el.querySelector(".id").textContent = id;
+    el.querySelector(".title").textContent = vault.notes[id];
+
+    const exExisting = el.querySelector(".expandbtn");
+    if(p.role==="current" && !exExisting){
+      const b = document.createElement("button");
+      b.className="expandbtn"; b.textContent="+";
+      b.title="Open note";
+      b.onclick=(e)=>{e.stopPropagation(); openFocusCard(id)};
+      el.appendChild(b);
+    } else if(p.role!=="current" && exExisting){
+      exExisting.remove();
+    }
+
+    const badgeEl = el.querySelector(".leafbadge");
+    el.className = "node " + p.cls;
+    if(id === kbFocus) el.classList.add("kb-focus");
+    if(p.role==="semantic"){
+      el.classList.add("leaf");
+      if(p.dir) el.classList.add("dir-" + p.dir);
+      const hasKids = fzHasChildren(id);
+      if(hasKids){
+        el.classList.add("has-children");
+        badgeEl.textContent = `${fzChildren(id).length}↓`;
+        badgeEl.style.display="";
+      } else { badgeEl.style.display="none" }
+    } else { badgeEl.style.display="none" }
+
+    el.onclick = (e)=>{
+      e.stopPropagation();
+      if(id===current){ kbFocus = id; return }
+      history.push(current);
+      current = id;
+      kbFocus = id;
+      render();
+    };
+
+    requestAnimationFrame(()=>{
+      el.style.left = p.x + "%";
+      el.style.top = p.y + "%";
+      el.style.opacity = "1";
+    });
+  }
+
+  for(const id in nodeEls){
+    if(!visibleIds.has(id)){
+      const el = nodeEls[id];
+      el.style.opacity = "0";
+      el.style.pointerEvents = "none";
+      setTimeout(()=>{
+        if(!visibleIds.has(id) && el.parentNode){ el.remove(); delete nodeEls[id] }
+      }, 400);
+    } else { nodeEls[id].style.pointerEvents="" }
+  }
+
+  renderEdges(pos);
+
+  document.getElementById("currentLabel").textContent = current+" "+vault.notes[current];
+  const semCount = effectiveSemantics(current).length;
+  const fzCount = (fzAncestors(current).length+fzChildren(current).length+fzSiblings(current).length);
+  document.getElementById("countLabel").textContent = `${fzCount} fz · ${semCount} references` + (showAll ? "" : " (outgoing only)");
+  document.getElementById("refCount").textContent = semCount;
+  document.getElementById("backbtn").classList.toggle("hidden", history.length===0);
+}
+
+function renderEdges(pos){
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  edgesSvg.innerHTML = "";
+  const ns = "http://www.w3.org/2000/svg";
+
+  const defs = document.createElementNS(ns,"defs");
+  defs.innerHTML = `<marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+    <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+  <marker id="arrRev" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>`;
+  edgesSvg.appendChild(defs);
+
+  const px = (id) => ({x: pos[id].x*w/100, y: pos[id].y*h/100});
+
+  const SPINE_ROLES = new Set(["current","ancestor","sibling","child","grandchild"]);
+  for(const id in pos){
+    const parent = fzParent(id);
+    if(parent && pos[parent]){
+      if(!SPINE_ROLES.has(pos[id].role) || !SPINE_ROLES.has(pos[parent].role)) continue;
+      const a=px(parent), b=px(id);
+      const line = document.createElementNS(ns,"path");
+      const d = a.x===b.x
+        ? `M${a.x},${a.y+26} L${b.x},${b.y-26}`
+        : `M${a.x},${a.y+20} C${a.x},${(a.y+b.y)/2} ${b.x},${(a.y+b.y)/2} ${b.x},${b.y-22}`;
+      line.setAttribute("d",d);
+      line.setAttribute("stroke","#a57bff");
+      line.setAttribute("stroke-width","1.9");
+      line.setAttribute("fill","none");
+      line.setAttribute("opacity",".82");
+      edgesSvg.appendChild(line);
+    }
+  }
+
+  // Truncated-ancestor indicator: when the current note has more than 2 ancestors,
+  // only the nearest 2 are rendered. A short dashed vertical line starting flush
+  // with the top of the topmost shown ancestor card signals "more spine continues
+  // upward." Anchored in pixel space so the line begins exactly at the card edge
+  // regardless of viewport height.
+  const totalAncs = fzAncestors(current).length;
+  if(totalAncs > 2){
+    const xPx = 50 * w / 100;
+    const cardHalfPx = 26; // matches the half-card offset used by parent edges
+    const topAncCenterPx = 28 * h / 100; // i=1 ancestor sits at y=28% (50 − 2×11)
+    const yBot = topAncCenterPx - cardHalfPx; // flush with top of card
+    const yTop = yBot - Math.min(70, h * 0.10); // 70px upward, or 10% of canvas if smaller
+    const dots = document.createElementNS(ns,"line");
+    dots.setAttribute("x1", xPx);
+    dots.setAttribute("y1", yBot);
+    dots.setAttribute("x2", xPx);
+    dots.setAttribute("y2", yTop);
+    dots.setAttribute("stroke", "#a57bff");
+    dots.setAttribute("stroke-width", "1.6");
+    dots.setAttribute("stroke-dasharray", "2 4");
+    dots.setAttribute("opacity", ".6");
+    dots.setAttribute("stroke-linecap", "round");
+    edgesSvg.appendChild(dots);
+  }
+
+  // Direction-aware semantic edges: ONE edge per halo neighbor.
+  //   out    → arrowhead at the neighbor end (current points outward)
+  //   in     → arrowhead at the current end  (neighbor points inward)
+  //   mutual → arrowheads at BOTH ends (heavier stroke + opacity to match the node treatment)
+  // Path is always drawn current → neighbor for layout consistency; markers select direction.
+  const semDir = {};
+  for(const n of effectiveSemantics(current)) semDir[n.id] = n.dir;
+  for(const id in pos){
+    if(pos[id].role !== "semantic") continue;
+    const dir = semDir[id]; if(!dir) continue;
+    const A = px(current), B = px(id);
+    const path = document.createElementNS(ns,"path");
+    // Bow control point outward from canvas center along the bisector
+    const mx=(A.x+B.x)/2, my=(A.y+B.y)/2;
+    const dx=mx-A.x, dy=my-A.y;
+    const len=Math.hypot(dx,dy)||1;
+    const cx=mx + (dx/len)*22;
+    const cy=my + (dy/len)*22;
+    path.setAttribute("d",`M${A.x},${A.y} Q${cx},${cy} ${B.x},${B.y}`);
+    path.setAttribute("stroke","#f5b544");
+    path.setAttribute("color","#f5b544");
+    path.setAttribute("fill","none");
+    path.setAttribute("stroke-dasharray","2 4");
+    if(dir === "mutual"){
+      path.setAttribute("stroke-width","1.7");
+      path.setAttribute("opacity",".9");
+      path.setAttribute("marker-start","url(#arrRev)");
+      path.setAttribute("marker-end","url(#arr)");
+    } else if(dir === "in"){
+      path.setAttribute("stroke-width","1.4");
+      path.setAttribute("opacity",".75");
+      path.setAttribute("marker-start","url(#arrRev)");
+    } else { // out
+      path.setAttribute("stroke-width","1.4");
+      path.setAttribute("opacity",".75");
+      path.setAttribute("marker-end","url(#arr)");
+    }
+    edgesSvg.appendChild(path);
+  }
+}
+
+// ============ FOCUS CARD ============
+function openFocusCard(id){
+  closeFocusCard();
+  const sources = vault.links
+    .filter(([a,t,b])=>a===id && t==="source")
+    .map(([a,t,b])=>b);
+  const scrim = document.createElement("div");
+  scrim.className="scrim";
+  scrim.onclick = closeFocusCard;
+  canvas.appendChild(scrim);
+
+  const card = document.createElement("div");
+  card.className="focuscard";
+  card.innerHTML = `
+    <button class="fc-close" title="Close">×</button>
+    <div class="fc-id">${id}</div>
+    <h2>${vault.notes[id]}</h2>
+    <div class="fc-body">
+      <p>This is a placeholder for the note's body. In the real plugin, this is where the markdown content would render.</p>
+      <p>Folgezettel position, link counts, and the source list below would all be derived from the live vault state.</p>
+    </div>
+    <div class="fc-srch">
+      <div class="lbl">sources · ${sources.length}</div>
+      ${sources.length===0
+        ? '<div class="nosrc">no sources cited</div>'
+        : sources.map(sid=>`<div class="src" data-id="${sid}"><span class="sid">${sid}</span><span class="stt">${vault.notes[sid]||"?"}</span></div>`).join("")}
+    </div>
+  `;
+  card.querySelector(".fc-close").onclick = closeFocusCard;
+  card.querySelectorAll(".src").forEach(el=>{
+    el.onclick = ()=>{
+      const sid = el.dataset.id;
+      closeFocusCard();
+      history.push(current); current = sid; render();
+    };
+  });
+  canvas.appendChild(card);
+}
+function closeFocusCard(){
+  canvas.querySelectorAll(".scrim,.focuscard").forEach(e=>e.remove());
+}
+
+// ============ KEYBOARD NAV ============
+function nearestInDirection(dirX, dirY){
+  const src = lastPositions[kbFocus]; if(!src) return null;
+  let best=null, bestScore=Infinity;
+  for(const id in lastPositions){
+    if(id===kbFocus) continue;
+    const p = lastPositions[id];
+    const dx = p.x - src.x, dy = p.y - src.y;
+    if(dirX!==0 && Math.sign(dx)!==dirX) continue;
+    if(dirY!==0 && Math.sign(dy)!==dirY) continue;
+    const primary = Math.abs(dirX!==0 ? dx : dy);
+    const ortho   = Math.abs(dirX!==0 ? dy : dx);
+    if(primary < ortho*0.7) continue;
+    const score = primary + ortho*2.2;
+    if(score < bestScore){ bestScore = score; best = id }
+  }
+  return best;
+}
+
+function setKbFocus(id){
+  if(!id || !lastPositions[id]) return;
+  kbFocus = id;
+  for(const nid in nodeEls){
+    nodeEls[nid].classList.toggle("kb-focus", nid===kbFocus);
+  }
+}
+
+function recenterOnFocus(){
+  if(!kbFocus || kbFocus===current) return;
+  history.push(current);
+  current = kbFocus;
+  render();
+}
+
+document.addEventListener("keydown",(e)=>{
+  const tag = (e.target && e.target.tagName) || "";
+  if(tag==="INPUT" || tag==="TEXTAREA" || e.target.isContentEditable) return;
+  if(e.key==="Escape"){ closeFocusCard(); return }
+  if(document.querySelector(".focuscard")) return;
+
+  let handled = true;
+  switch(e.key){
+    case "ArrowUp":    setKbFocus(nearestInDirection(0,-1)); break;
+    case "ArrowDown":  setKbFocus(nearestInDirection(0, 1)); break;
+    case "ArrowLeft":  setKbFocus(nearestInDirection(-1,0)); break;
+    case "ArrowRight": setKbFocus(nearestInDirection( 1,0)); break;
+    case "Enter": recenterOnFocus(); break;
+    case "Backspace":
+      if(history.length){ current = history.pop(); kbFocus = current; render() }
+      break;
+    case "f": case "F": openFocusCard(current); break;
+    default: handled = false;
+  }
+  if(handled) e.preventDefault();
+});
+
+// ============ FILTER CHIP ============
+document.querySelectorAll(".chip[data-type]").forEach(chip=>{
+  const t = chip.dataset.type;
+  if(!filters.has(t)) chip.classList.add("off");
+  chip.addEventListener("click",()=>{
+    if(filters.has(t)){ filters.delete(t); chip.classList.add("off") }
+    else { filters.add(t); chip.classList.remove("off") }
+    render();
+  });
+});
+
+// ============ BACK BUTTON ============
+document.getElementById("backbtn").addEventListener("click",()=>{
+  if(history.length===0) return;
+  current = history.pop();
+  render();
+});
+
+// ============ SETTING PILL (preview of plugin's settings-tab toggle) ============
+function applyShowAllToUI(){
+  const pill = document.getElementById("settingPill");
+  document.getElementById("settingState").textContent = showAll ? "ON" : "OFF";
+  pill.classList.toggle("on", showAll);
+  pill.classList.toggle("off", !showAll);
+  // Legend entries that have no meaning when showAll is off get dimmed
+  document.getElementById("lg-mutual").classList.toggle("dim", !showAll);
+  document.getElementById("lg-in").classList.toggle("dim", !showAll);
+}
+document.getElementById("settingPill").addEventListener("click",()=>{
+  showAll = !showAll;
+  applyShowAllToUI();
+  render();
+});
+applyShowAllToUI();
+
+// ============ INIT ============
+window.addEventListener("resize",()=>renderEdges(layout(current)));
+render(false);
+</script>
+</body></html>
