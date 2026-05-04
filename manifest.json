@@ -1,0 +1,9 @@
+{
+	"id": "stumblespace",
+	"name": "Stumblespace",
+	"version": "1.0.0",
+	"minAppVersion": "0.15.0",
+	"description": "A spatial canvas that visualizes Folgezettel relationships and semantic references around the current note.",
+	"author": "Klaus",
+	"isDesktopOnly": false
+}
