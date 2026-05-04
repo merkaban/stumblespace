@@ -17,6 +17,12 @@ The project has two artifacts:
 - When in doubt, go back to plan mode and clarify. Never assume.
 - No complicated ivory tower code: concise, clean and simple wins.
 
+## Pre-commit Checklist
+
+Before every commit, review the changes against these questions:
+1. **Simplify:** Can any of this code be made more concise, simpler, or cleaner? Refactor before committing.
+2. **Tests:** Do these changes need automated tests? Pure logic (graph/*, layout.ts) should have tests. Write them before committing.
+
 ## Build & Development
 
 This will be an Obsidian plugin using the standard template:
@@ -69,7 +75,7 @@ These cause auto-rejection at community plugin review:
 
 ## Core Domain Concepts
 
-- **Folgezettel ID:** derived from filename prefix (`22a3 Title.md` → ID `22a3`). Alternating (`22a3b1`) or dotted (`22.1.3.2`). No `id:` frontmatter field.
+- **Folgezettel ID:** derived from filename prefix (e.g. `1.1a3 Title.md` → ID `1.1a3`). Format: number + dot + alternating number-letter segments (e.g. `1.1a`, `2.1b2`, `1.1a3b1`). No `id:` frontmatter field.
 - **Spine:** ancestors (max 2 shown), siblings, children, grandchildren (only if ≤2 children). Violet edges.
 - **Halo:** semantic references on arc `[195°,265°] ∪ [275°,345°]` with 10° dead zone at 270°. Grouped left→right: outgoing → mutual → incoming.
 - **Reference exclusion:** a wikilink becomes a halo reference ONLY if target is not an ancestor/descendant/sibling/self of current AND not in `sources:` frontmatter.

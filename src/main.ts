@@ -1,8 +1,14 @@
 import { Plugin } from "obsidian";
 import { StumblespaceView, VIEW_TYPE } from "./view";
+import { VaultIndex } from "./graph/index";
 
 export default class StumblespacePlugin extends Plugin {
+	index!: VaultIndex;
+	private rebuildTimer: number | null = null;
+
 	async onload(): Promise<void> {
+		this.index = new VaultIndex(this.app);
+
 		this.registerView(VIEW_TYPE, (leaf) => new StumblespaceView(leaf));
 
 		this.addCommand({
@@ -10,6 +16,22 @@ export default class StumblespacePlugin extends Plugin {
 			name: "Open spatial canvas",
 			callback: () => this.activateView(),
 		});
+
+		// Vault subscriptions — debounced rebuild
+		const scheduleRebuild = () => {
+			if (this.rebuildTimer !== null) window.clearTimeout(this.rebuildTimer);
+			this.rebuildTimer = window.setTimeout(() => {
+				this.index.rebuild();
+				this.rebuildTimer = null;
+			}, 250);
+		};
+
+		this.registerEvent(
+			this.app.metadataCache.on("resolved", scheduleRebuild),
+		);
+		this.registerEvent(this.app.vault.on("rename", scheduleRebuild));
+		this.registerEvent(this.app.vault.on("delete", scheduleRebuild));
+		this.registerEvent(this.app.vault.on("create", scheduleRebuild));
 	}
 
 	async activateView(): Promise<void> {
