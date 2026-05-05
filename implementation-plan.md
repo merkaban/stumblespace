@@ -182,7 +182,7 @@ interface ZSCSettings {
 
 Each milestone is independently testable. Don't move on until acceptance criteria pass.
 
-### M0 — Skeleton plugin
+### M0 — Skeleton plugin ✅
 
 **Tasks**
 - Clone `obsidianmd/obsidian-sample-plugin` template.
@@ -197,7 +197,7 @@ Each milestone is independently testable. Don't move on until acceptance criteri
 - ESLint with the obsidianmd preset passes.
 - `npm run build` produces `main.js` and `manifest.json` in repo root.
 
-### M1 — Folgezettel parsing & VaultIndex
+### M1 — Folgezettel parsing & VaultIndex ✅
 
 **Tasks**
 - Port from prototype directly (these are pure, no DOM):
@@ -226,7 +226,7 @@ Each milestone is independently testable. Don't move on until acceptance criteri
 - Deleting a file removes it from `byId`.
 - `isFolgezettelRelative('22a3', '22a3a1')` returns true; `isFolgezettelRelative('22a3', '22b')` returns false.
 
-### M2 — Port the canvas
+### M2 — Port the canvas ✅
 
 **Goal:** Render the prototype's exact spatial layout, fed by VaultIndex, in an Obsidian view. Port the prototype's render pipeline; do not reinvent.
 

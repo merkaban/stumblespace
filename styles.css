@@ -1,0 +1,226 @@
+/* Stumblespace — spatial Zettelkasten canvas */
+
+.stumblespace-root {
+	--ss-violet: #a57bff;
+	--ss-amber: #f5b544;
+	--ss-panel: var(--background-secondary);
+	--ss-line: var(--background-modifier-border);
+	--ss-ink: var(--text-normal);
+	--ss-ink2: var(--text-muted);
+	--ss-ink3: var(--text-faint);
+	--ss-font: var(--font-monospace);
+	overflow: hidden;
+}
+
+/* Canvas */
+.ss-canvas {
+	position: relative;
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
+	background: radial-gradient(1100px 700px at 50% 50%,
+		var(--background-primary) 0%,
+		var(--background-primary-alt) 55%,
+		var(--background-secondary) 100%);
+}
+
+.ss-grain {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	opacity: .035;
+	background-image: radial-gradient(var(--ss-ink) 1px, transparent 1px);
+	background-size: 3px 3px;
+}
+
+/* SVG edges */
+.ss-edges {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	pointer-events: none;
+}
+/* No transitions on SVG edges — they're rebuilt from scratch each render */
+
+/* Node base */
+.ss-node {
+	position: absolute;
+	z-index: 2;
+	transform: translate(-50%, -50%);
+	background: var(--ss-panel);
+	border: 1px solid var(--ss-line);
+	border-radius: 8px;
+	padding: 8px 11px;
+	min-width: 140px;
+	max-width: 200px;
+	box-shadow: 0 8px 24px rgba(0, 0, 0, .35);
+	cursor: pointer;
+	transition: left .5s cubic-bezier(.65, .05, .36, 1),
+		top .5s cubic-bezier(.65, .05, .36, 1),
+		opacity .35s, transform .15s, border-color .15s;
+}
+.ss-node:hover {
+	border-color: var(--ss-ink3);
+	z-index: 50;
+}
+.ss-node:hover .ss-title { color: var(--ss-ink); }
+
+.ss-id {
+	font-family: var(--ss-font);
+	font-size: 10.5px;
+	color: var(--ss-ink3);
+	letter-spacing: .04em;
+}
+.ss-title {
+	font-size: 12.5px;
+	font-weight: 500;
+	line-height: 1.35;
+	margin-top: 2px;
+	color: var(--ss-ink);
+}
+
+/* Spine nodes */
+.ss-spine {
+	border-color: color-mix(in srgb, var(--ss-violet) 55%, var(--ss-line));
+	box-shadow: 0 0 0 1px color-mix(in srgb, var(--ss-violet) 25%, transparent),
+		0 10px 28px rgba(0, 0, 0, .4);
+}
+.ss-spine .ss-id { color: color-mix(in srgb, var(--ss-violet) 85%, var(--ss-ink2)); }
+
+/* Current node — z-index 1 so overlapping siblings (z-index 2) stay hoverable */
+.ss-current {
+	background: linear-gradient(180deg, color-mix(in srgb, var(--ss-violet) 35%, var(--ss-panel)), var(--ss-panel));
+	border-color: var(--ss-violet);
+	box-shadow: 0 0 0 2px color-mix(in srgb, var(--ss-violet) 55%, transparent),
+		0 12px 34px color-mix(in srgb, var(--ss-violet) 25%, transparent);
+	cursor: default;
+	z-index: 1;
+}
+.ss-current .ss-title { color: var(--ss-ink); font-weight: 600; }
+
+/* Dimmed nodes (siblings, grandchildren) */
+.ss-dim { opacity: .65; }
+
+/* Leaf badge */
+.ss-leafbadge {
+	position: absolute;
+	top: -7px;
+	right: -7px;
+	font-family: var(--ss-font);
+	font-size: 8.5px;
+	padding: 1px 6px;
+	background: var(--ss-panel);
+	border: 1px solid var(--ss-line);
+	border-radius: 3px;
+	color: var(--ss-ink3);
+	letter-spacing: .08em;
+	text-transform: uppercase;
+	pointer-events: none;
+}
+.ss-has-children .ss-leafbadge {
+	color: color-mix(in srgb, var(--ss-violet) 80%, var(--ss-ink2));
+	border-color: color-mix(in srgb, var(--ss-violet) 40%, var(--ss-line));
+}
+
+/* Semantic leaf nodes — direction encoding */
+.ss-leaf {
+	background: var(--ss-panel);
+	border: 1px solid var(--ss-line);
+}
+.ss-dir-out { border-left: 3px solid var(--ss-amber); }
+.ss-dir-in {
+	background: color-mix(in srgb, var(--ss-amber) 3%, var(--ss-panel));
+	border: 1px dashed color-mix(in srgb, var(--ss-amber) 65%, var(--ss-line));
+}
+.ss-dir-mutual {
+	background: linear-gradient(180deg, color-mix(in srgb, var(--ss-amber) 12%, var(--ss-panel)), var(--ss-panel));
+	border: 1px solid color-mix(in srgb, var(--ss-amber) 75%, var(--ss-line));
+	box-shadow:
+		0 0 0 1px color-mix(in srgb, var(--ss-amber) 30%, transparent),
+		0 0 14px color-mix(in srgb, var(--ss-amber) 22%, transparent),
+		0 10px 24px rgba(0, 0, 0, .4);
+}
+.ss-dir-mutual .ss-id { color: color-mix(in srgb, var(--ss-amber) 70%, var(--ss-ink2)); }
+
+/* Expand button (+ on current node) */
+.ss-expandbtn {
+	position: absolute;
+	top: -9px;
+	right: -9px;
+	width: 20px;
+	height: 20px;
+	border-radius: 50%;
+	background: var(--ss-violet);
+	color: #fff;
+	font-size: 13px;
+	font-weight: 700;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	box-shadow: 0 0 12px color-mix(in srgb, var(--ss-violet) 60%, transparent);
+	border: 0;
+	line-height: 1;
+	z-index: 60;
+}
+.ss-expandbtn:hover { transform: scale(1.1); }
+
+/* Keyboard focus ring */
+.ss-kb-focus { z-index: 50; }
+.ss-kb-focus::before {
+	content: "";
+	position: absolute;
+	inset: -6px;
+	border-radius: 11px;
+	border: 1.5px dashed var(--ss-ink);
+	opacity: .75;
+	pointer-events: none;
+	animation: ss-kbpulse 1.6s ease-in-out infinite;
+}
+@keyframes ss-kbpulse {
+	0%, 100% { opacity: .45; }
+	50% { opacity: .9; }
+}
+
+/* Back button */
+.ss-backbtn {
+	position: absolute;
+	right: 16px;
+	bottom: 14px;
+	font-family: var(--ss-font);
+	font-size: 11px;
+	color: var(--ss-ink2);
+	background: color-mix(in srgb, var(--background-primary) 70%, transparent);
+	border: 1px solid var(--ss-line);
+	border-radius: 6px;
+	padding: 7px 11px;
+	cursor: pointer;
+	backdrop-filter: blur(6px);
+	z-index: 40;
+}
+.ss-backbtn:hover { border-color: var(--ss-violet); color: var(--ss-ink); }
+.ss-hidden { opacity: 0; pointer-events: none; }
+
+/* Splash (empty state) */
+.ss-splash {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	text-align: center;
+	color: var(--ss-ink3);
+}
+.ss-splash h3 {
+	margin: 0 0 8px;
+	color: var(--ss-ink2);
+	font-size: 16px;
+}
+.ss-splash p { margin: 0; font-size: 13px; }
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+	.ss-node { transition: opacity .15s; }
+	.ss-edges path, .ss-edges line { transition: none; }
+	.ss-kb-focus::before { animation: none; opacity: .75; }
+}

@@ -1,0 +1,289 @@
+import { fzParent } from "./graph/folgezettel";
+import type { PositionMap } from "./layout";
+import type { StumblespaceView } from "./view";
+
+const NS_SVG = "http://www.w3.org/2000/svg";
+const SPINE_ROLES = new Set(["current", "ancestor", "sibling", "child", "grandchild"]);
+
+export class CanvasRenderer {
+	private nodeEls = new Map<string, HTMLElement>();
+	private fadeTimers = new Map<string, number>();
+	private lastPositions: PositionMap = new Map();
+	private canvas: HTMLElement;
+	private svg: SVGSVGElement;
+	private view: StumblespaceView;
+
+	constructor(view: StumblespaceView, canvas: HTMLElement, svg: SVGSVGElement) {
+		this.view = view;
+		this.canvas = canvas;
+		this.svg = svg;
+	}
+
+	render(positions: PositionMap): void {
+		const visibleIds = new Set(positions.keys());
+
+		for (const [id, pos] of positions) {
+			let el = this.nodeEls.get(id);
+			// Defensive: if el is detached (e.g. canvas was rebuilt) recreate it
+			let isNew = !el;
+			if (el && !this.canvas.contains(el)) {
+				this.nodeEls.delete(id);
+				isNew = true;
+				el = undefined;
+			}
+			if (!el) {
+				el = this.createNodeEl(id);
+				this.nodeEls.set(id, el);
+			}
+			// Cancel any pending fade-out — this node is visible again
+			const pending = this.fadeTimers.get(id);
+			if (pending !== undefined) {
+				window.clearTimeout(pending);
+				this.fadeTimers.delete(id);
+			}
+			this.updateNodeEl(el, id, pos, isNew);
+		}
+
+		// Fade out removed nodes
+		for (const [id, el] of this.nodeEls) {
+			if (!visibleIds.has(id)) {
+				// If a fading node holds focus, hand it back to the view container
+				// so keyboard handler keeps receiving events.
+				if (el === document.activeElement || el.contains(document.activeElement)) {
+					this.view.contentEl.focus({ preventScroll: true });
+				}
+				el.style.opacity = "0";
+				el.style.pointerEvents = "none";
+				const existing = this.fadeTimers.get(id);
+				if (existing !== undefined) window.clearTimeout(existing);
+				const timer = window.setTimeout(() => {
+					this.fadeTimers.delete(id);
+					if (!this.lastPositions.has(id) && el.parentNode) {
+						el.remove();
+						this.nodeEls.delete(id);
+					}
+				}, 400);
+				this.fadeTimers.set(id, timer);
+			}
+		}
+
+		this.lastPositions = positions;
+		this.renderEdges(positions);
+	}
+
+	/** Redraw only edges (e.g. on resize — nodes reflow via CSS %). */
+	redrawEdges(): void {
+		if (this.lastPositions.size > 0) this.renderEdges(this.lastPositions);
+	}
+
+	destroy(): void {
+		for (const timer of this.fadeTimers.values()) window.clearTimeout(timer);
+		this.fadeTimers.clear();
+		this.nodeEls.clear();
+	}
+
+	private createNodeEl(id: string): HTMLElement {
+		const el = this.canvas.createDiv({ cls: "ss-node" });
+		el.createDiv({ cls: "ss-id", text: id });
+		el.createDiv({ cls: "ss-title" });
+		el.createDiv({ cls: "ss-leafbadge" });
+
+		el.style.left = "50%";
+		el.style.top = "50%";
+		el.style.opacity = "0";
+		el.setAttribute("role", "button");
+		el.setAttribute("tabindex", "0");
+
+		this.view.registerDomEvent(el, "click", (e: MouseEvent) => {
+			e.stopPropagation();
+			this.view.handleNodeClick(id, e);
+		});
+
+		return el;
+	}
+
+	private updateNodeEl(el: HTMLElement, id: string, pos: { x: number; y: number; role: string; dir?: string }, isNew: boolean): void {
+		const index = this.view.getIndex();
+		const file = index.getNote(id);
+		const title = file ? file.basename.replace(/^\S+\s/, "") : id;
+
+		el.querySelector(".ss-title")!.textContent = title;
+		el.setAttribute("aria-label", `Recenter on ${id} ${title}`);
+
+		// Build class list
+		const classes = ["ss-node"];
+		if (pos.role === "current") classes.push("ss-current");
+		if (pos.role === "ancestor" || pos.role === "child") classes.push("ss-spine");
+		if (pos.role === "sibling" || pos.role === "grandchild") classes.push("ss-spine", "ss-dim");
+		if (pos.role === "semantic") {
+			classes.push("ss-leaf");
+			if (pos.dir) classes.push(`ss-dir-${pos.dir}`);
+			const childCount = index.getChildren(id).length;
+			const badge = el.querySelector(".ss-leafbadge") as HTMLElement;
+			if (childCount > 0) {
+				classes.push("ss-has-children");
+				badge.textContent = `${childCount}\u2193`;
+				badge.style.display = "";
+			} else {
+				badge.style.display = "none";
+			}
+		} else {
+			(el.querySelector(".ss-leafbadge") as HTMLElement).style.display = "none";
+		}
+
+		if (this.view.state.kbFocus === id) classes.push("ss-kb-focus");
+		el.className = classes.join(" ");
+
+		// Expand button on current node
+		const existingBtn = el.querySelector(".ss-expandbtn");
+		if (pos.role === "current" && !existingBtn) {
+			const btn = el.createEl("button", { cls: "ss-expandbtn", text: "+", attr: { title: "Open note" } });
+			this.view.registerDomEvent(btn, "click", (e: MouseEvent) => {
+				e.stopPropagation();
+				this.view.openFocusCard();
+			});
+		} else if (pos.role !== "current" && existingBtn) {
+			existingBtn.remove();
+		}
+
+		el.style.left = pos.x + "%";
+		el.style.top = pos.y + "%";
+		el.style.pointerEvents = "";
+		if (isNew) {
+			// Defer opacity to next frame so the CSS transition from 0 \u2192 1 plays.
+			requestAnimationFrame(() => { el.style.opacity = "1"; });
+		} else {
+			// Existing node: set opacity sync to override any stale fade state.
+			el.style.opacity = "1";
+		}
+	}
+
+	private renderEdges(positions: PositionMap): void {
+		while (this.svg.firstChild) this.svg.firstChild.remove();
+
+		const w = this.canvas.clientWidth;
+		const h = this.canvas.clientHeight;
+		if (w === 0 || h === 0) return;
+
+		// Create SVG marker defs
+		const defs = document.createElementNS(NS_SVG, "defs");
+		defs.appendChild(this.createMarker("ss-arr", "auto"));
+		defs.appendChild(this.createMarker("ss-arr-rev", "auto-start-reverse"));
+		this.svg.appendChild(defs);
+
+		const px = (id: string) => {
+			const p = positions.get(id)!;
+			return { x: (p.x * w) / 100, y: (p.y * h) / 100 };
+		};
+
+		// Spine edges (folgezettel parent→child)
+		for (const [id, p] of positions) {
+			const parent = fzParent(id);
+			if (!parent || !positions.has(parent)) continue;
+			if (!SPINE_ROLES.has(p.role) || !SPINE_ROLES.has(positions.get(parent)!.role)) continue;
+
+			const a = px(parent);
+			const b = px(id);
+			const d = a.x === b.x
+				? `M${a.x},${a.y + 26} L${b.x},${b.y - 26}`
+				: `M${a.x},${a.y + 20} C${a.x},${(a.y + b.y) / 2} ${b.x},${(a.y + b.y) / 2} ${b.x},${b.y - 22}`;
+
+			this.svgPath(d, { stroke: "var(--ss-violet)", "stroke-width": "1.9", fill: "none", opacity: ".82" });
+		}
+
+		// Truncated-ancestor indicator
+		const currentId = this.view.state.currentId;
+		if (currentId) {
+			const totalAncs = this.view.getIndex().getAncestors(currentId).length;
+			if (totalAncs > 2) {
+				const xPx = (50 * w) / 100;
+				const topAncCenterPx = (22 * h) / 100;
+				const yBot = topAncCenterPx - 26;
+				const yTop = yBot - Math.min(70, h * 0.1);
+				const line = document.createElementNS(NS_SVG, "line");
+				this.setSvgAttrs(line, {
+					x1: xPx, y1: yBot, x2: xPx, y2: yTop,
+					stroke: "var(--ss-violet)", "stroke-width": "1.6",
+					"stroke-dasharray": "2 4", opacity: ".6", "stroke-linecap": "round",
+				});
+				this.svg.appendChild(line);
+			}
+		}
+
+		// Semantic edges (direction-aware)
+		if (!currentId) return;
+		const refs = this.view.getIndex().getReferences(currentId);
+		const dirMap = new Map(refs.map((r) => [r.id, r.dir]));
+
+		for (const [id, p] of positions) {
+			if (p.role !== "semantic") continue;
+			const dir = dirMap.get(id);
+			if (!dir) continue;
+
+			const A = px(currentId);
+			const B = px(id);
+			const mx = (A.x + B.x) / 2, my = (A.y + B.y) / 2;
+			const dx = mx - A.x, dy = my - A.y;
+			const len = Math.hypot(dx, dy) || 1;
+			const cx = mx + (dx / len) * 22;
+			const cy = my + (dy / len) * 22;
+
+			const attrs: Record<string, string | number> = {
+				stroke: "var(--ss-amber)", color: "var(--ss-amber)",
+				fill: "none", "stroke-dasharray": "2 4",
+			};
+
+			if (dir === "mutual") {
+				Object.assign(attrs, {
+					"stroke-width": "1.7", opacity: ".9",
+					"marker-start": "url(#ss-arr-rev)", "marker-end": "url(#ss-arr)",
+				});
+			} else if (dir === "in") {
+				Object.assign(attrs, {
+					"stroke-width": "1.4", opacity: ".75",
+					"marker-start": "url(#ss-arr-rev)",
+				});
+			} else {
+				Object.assign(attrs, {
+					"stroke-width": "1.4", opacity: ".75",
+					"marker-end": "url(#ss-arr)",
+				});
+			}
+
+			this.svgPath(`M${A.x},${A.y} Q${cx},${cy} ${B.x},${B.y}`, attrs);
+		}
+	}
+
+	private createMarker(id: string, orient: string): SVGMarkerElement {
+		const marker = document.createElementNS(NS_SVG, "marker") as SVGMarkerElement;
+		this.setSvgAttrs(marker, {
+			id, viewBox: "0 0 10 10", refX: 9, refY: 5,
+			markerWidth: 5, markerHeight: 5, orient,
+		});
+		const path = document.createElementNS(NS_SVG, "path");
+		path.setAttribute("d", "M0,0 L10,5 L0,10 z");
+		path.style.fill = "currentColor";
+		marker.appendChild(path);
+		return marker;
+	}
+
+	private svgPath(d: string, attrs: Record<string, string | number>): void {
+		const path = document.createElementNS(NS_SVG, "path");
+		path.setAttribute("d", d);
+		this.setSvgAttrs(path, attrs);
+		this.svg.appendChild(path);
+	}
+
+	/** Set SVG attributes — uses style for paint properties that may contain var(). */
+	private setSvgAttrs(el: SVGElement, attrs: Record<string, string | number>): void {
+		const STYLE_PROPS = new Set(["stroke", "fill", "color", "opacity", "stroke-width",
+			"stroke-dasharray", "stroke-linecap"]);
+		for (const [k, v] of Object.entries(attrs)) {
+			if (STYLE_PROPS.has(k)) {
+				el.style.setProperty(k, String(v));
+			} else {
+				el.setAttribute(k, String(v));
+			}
+		}
+	}
+}
