@@ -286,6 +286,102 @@
 	margin-top: 14px;
 }
 
+/* Focus card */
+.ss-scrim {
+	position: absolute;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.5);
+	backdrop-filter: blur(2px);
+	z-index: 100;
+}
+.ss-focuscard {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	width: min(720px, 90%);
+	max-height: 80%;
+	display: flex;
+	flex-direction: column;
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 10px;
+	box-shadow: 0 24px 60px rgba(0, 0, 0, .5);
+	z-index: 101;
+	overflow: hidden;
+}
+.ss-fc-header {
+	padding: 14px 18px;
+	border-bottom: 1px solid var(--ss-line);
+	display: flex;
+	align-items: baseline;
+	gap: 10px;
+}
+.ss-fc-id {
+	font-family: var(--ss-font);
+	color: var(--ss-ink3);
+	font-size: 11px;
+	letter-spacing: .05em;
+}
+.ss-fc-title {
+	flex: 1;
+	font-size: 15px;
+	font-weight: 600;
+	color: var(--ss-ink);
+}
+.ss-fc-close {
+	background: transparent;
+	border: 0;
+	font-size: 18px;
+	cursor: pointer;
+	color: var(--ss-ink2);
+	padding: 0 6px;
+	line-height: 1;
+}
+.ss-fc-close:hover { color: var(--ss-ink); }
+.ss-fc-body {
+	padding: 16px 22px;
+	overflow-y: auto;
+	flex: 1;
+	color: var(--ss-ink);
+}
+.ss-fc-sources {
+	padding: 12px 22px 18px;
+	border-top: 1px solid var(--ss-line);
+}
+.ss-fc-sources h4 {
+	margin: 0 0 8px;
+	font-size: 12px;
+	color: var(--ss-ink2);
+	font-weight: 600;
+}
+.ss-fc-sources ul {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+.ss-fc-source {
+	display: block;
+	width: 100%;
+	text-align: left;
+	background: var(--background-secondary);
+	border: 1px solid var(--ss-line);
+	border-radius: 6px;
+	padding: 6px 10px;
+	margin-bottom: 4px;
+	cursor: pointer;
+	font-family: var(--ss-font);
+	font-size: 12px;
+	color: var(--ss-ink);
+}
+.ss-fc-source:hover { border-color: var(--ss-violet); }
+.ss-fc-source-missing {
+	cursor: default;
+	color: var(--ss-ink3);
+	font-style: italic;
+}
+.ss-fc-source-missing:hover { border-color: var(--ss-line); }
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
 	.ss-node { transition: opacity .15s; }

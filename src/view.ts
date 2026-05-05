@@ -3,6 +3,7 @@ import { layout, type PositionMap } from "./layout";
 import { CanvasRenderer } from "./render";
 import { attachKeyboardHandler } from "./ui/keyboard";
 import { renderSplash, type SplashMode } from "./ui/splash";
+import { FocusCard } from "./ui/focusCard";
 import { parseIdFromFilename, VaultIndex } from "./graph/index";
 import type StumblespacePlugin from "./main";
 
@@ -27,6 +28,7 @@ export class StumblespaceView extends ItemView {
 	private renderer: CanvasRenderer | null = null;
 	private canvasEl: HTMLElement | null = null;
 	private splashEl: HTMLElement | null = null;
+	private activeFocusCard: FocusCard | null = null;
 
 	constructor(leaf: WorkspaceLeaf) {
 		super(leaf);
@@ -242,14 +244,21 @@ export class StumblespaceView extends ItemView {
 		});
 	}
 
-	// Focus card stubs (M4)
 	openFocusCard(): void {
-		// Will be implemented in M4
+		if (this.activeFocusCard || !this.state.currentId) return;
+		const card = new FocusCard(this, this.state.currentId);
+		this.activeFocusCard = card;
+		this.addChild(card);
+		void card.open();
 	}
 
 	closeFocusCard(): void {
-		if (!this.canvasEl) return;
-		this.canvasEl.querySelectorAll(".ss-scrim, .ss-focuscard").forEach((el) => el.remove());
+		if (!this.activeFocusCard) return;
+		const card = this.activeFocusCard;
+		this.activeFocusCard = null;
+		this.removeChild(card);
+		// Restore focus to the view container so keyboard nav keeps receiving keys.
+		this.contentEl.focus({ preventScroll: true });
 	}
 
 	// Splash
