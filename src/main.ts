@@ -1,12 +1,17 @@
 import { Plugin } from "obsidian";
 import { StumblespaceView, VIEW_TYPE } from "./view";
 import { VaultIndex } from "./graph/index";
+import { DEFAULT_SETTINGS, type StumblespaceSettings } from "./settings/schema";
+import { StumblespaceSettingTab } from "./settings/tab";
 
 export default class StumblespacePlugin extends Plugin {
 	index!: VaultIndex;
+	settings!: StumblespaceSettings;
 	private rebuildTimer: number | null = null;
 
 	async onload(): Promise<void> {
+		await this.loadSettings();
+
 		this.index = new VaultIndex(this.app);
 
 		this.registerView(VIEW_TYPE, (leaf) => new StumblespaceView(leaf));
@@ -16,6 +21,8 @@ export default class StumblespacePlugin extends Plugin {
 			name: "Open spatial canvas",
 			callback: () => this.activateView(),
 		});
+
+		this.addSettingTab(new StumblespaceSettingTab(this.app, this));
 
 		// Vault subscriptions — debounced rebuild + notify open views
 		const scheduleRebuild = () => {
@@ -36,6 +43,19 @@ export default class StumblespacePlugin extends Plugin {
 		this.registerEvent(this.app.vault.on("rename", scheduleRebuild));
 		this.registerEvent(this.app.vault.on("delete", scheduleRebuild));
 		this.registerEvent(this.app.vault.on("create", scheduleRebuild));
+	}
+
+	async loadSettings(): Promise<void> {
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+	}
+
+	async saveSettings(opts?: { skipNotify?: boolean }): Promise<void> {
+		await this.saveData(this.settings);
+		if (opts?.skipNotify) return;
+		for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE)) {
+			const v = leaf.view;
+			if (v instanceof StumblespaceView) v.applySettings();
+		}
 	}
 
 	async activateView(): Promise<void> {

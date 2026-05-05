@@ -1,4 +1,5 @@
-import type { Dir, Reference } from "./graph/semantics";
+import { effectiveSemantics, type Dir, type Reference } from "./graph/semantics";
+import type { StumblespaceSettings } from "./settings/schema";
 
 export type Role = "current" | "ancestor" | "sibling" | "child" | "grandchild" | "semantic";
 
@@ -21,6 +22,7 @@ interface LayoutInput {
 	/** Map from child ID → its children IDs */
 	grandchildrenByKid: Map<string, string[]>;
 	references: Reference[];
+	settings: StumblespaceSettings;
 }
 
 const ARCS: [number, number][] = [[195, 265], [275, 345]];
@@ -72,8 +74,10 @@ export function layout(input: LayoutInput): PositionMap {
 		}
 	}
 
-	// Halo: semantic references on arc, grouped by direction
-	const semantics = input.references.filter((n) => !pos.has(n.id));
+	// Halo: semantic references on arc, grouped by direction.
+	// effectiveSemantics applies the show-incoming/mutual toggle.
+	const filteredRefs = effectiveSemantics(input.references, input.settings);
+	const semantics = filteredRefs.filter((n) => !pos.has(n.id));
 	const sorted = [...semantics].sort((a, b) => {
 		const da = DIR_ORDER[a.dir], db = DIR_ORDER[b.dir];
 		if (da !== db) return da - db;

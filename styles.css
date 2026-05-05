@@ -56,8 +56,8 @@
 	max-width: 200px;
 	box-shadow: 0 8px 24px rgba(0, 0, 0, .35);
 	cursor: pointer;
-	transition: left .5s cubic-bezier(.65, .05, .36, 1),
-		top .5s cubic-bezier(.65, .05, .36, 1),
+	transition: left var(--ss-anim-duration, 500ms) cubic-bezier(.65, .05, .36, 1),
+		top var(--ss-anim-duration, 500ms) cubic-bezier(.65, .05, .36, 1),
 		opacity .35s, transform .15s, border-color .15s;
 }
 .ss-node:hover {
@@ -258,32 +258,6 @@
 .ss-splash-item:hover {
 	border-color: var(--ss-violet);
 	background: color-mix(in srgb, var(--ss-violet) 8%, var(--ss-panel));
-}
-
-.ss-splash-action {
-	margin-top: 8px;
-	padding: 6px 14px;
-	background: var(--ss-violet);
-	color: #fff;
-	border: 0;
-	border-radius: 6px;
-	font-size: 12px;
-	cursor: pointer;
-}
-.ss-splash-action:hover { filter: brightness(1.1); }
-
-/* Modal inputs (Add ID, Ghost stub) */
-.ss-modal-input {
-	width: 100%;
-	margin-top: 8px;
-	padding: 6px 8px;
-	font-family: var(--ss-font);
-}
-.ss-modal-buttons {
-	display: flex;
-	gap: 8px;
-	justify-content: flex-end;
-	margin-top: 14px;
 }
 
 /* Focus card */

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { layout } from "./layout";
+import { DEFAULT_SETTINGS } from "./settings/schema";
 
 const baseInput = {
 	currentId: "1.1a3",
@@ -14,6 +15,7 @@ const baseInput = {
 		{ id: "5.1f", dir: "out" as const },
 		{ id: "2.1b2", dir: "in" as const },
 	],
+	settings: DEFAULT_SETTINGS,
 };
 
 describe("layout", () => {
@@ -106,5 +108,20 @@ describe("layout", () => {
 		const outIdx = dirs.indexOf("out");
 		const inIdx = dirs.lastIndexOf("in");
 		expect(outIdx).toBeLessThan(inIdx);
+	});
+
+	it("hides incoming and demotes mutual when showIncomingAndMutual is off", () => {
+		const input = {
+			...baseInput,
+			settings: { ...DEFAULT_SETTINGS, showIncomingAndMutual: false },
+		};
+		const pos = layout(input);
+		// Incoming dropped
+		expect(pos.has("2.1b2")).toBe(false);
+		// Mutuals demoted to out
+		expect(pos.get("2.1b")?.dir).toBe("out");
+		expect(pos.get("3.1c")?.dir).toBe("out");
+		// Out remain
+		expect(pos.get("4.1a")?.dir).toBe("out");
 	});
 });

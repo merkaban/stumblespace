@@ -1,4 +1,5 @@
 import { parseFz, fzParent } from "./folgezettel";
+import type { StumblespaceSettings } from "../settings/schema";
 
 export type Dir = "out" | "in" | "mutual";
 export interface Reference {
@@ -39,4 +40,23 @@ export function isFolgezettelRelative(
 	const cp = fzParent(currentId);
 	const op = fzParent(otherId);
 	return cp !== null && cp === op;
+}
+
+/**
+ * Apply the "show incoming + mutual" toggle.
+ * When OFF: drop incoming-only refs, demote mutuals to plain outgoing.
+ * When ON: identity.
+ */
+export function effectiveSemantics(
+	refs: Reference[],
+	settings: StumblespaceSettings,
+): Reference[] {
+	if (settings.showIncomingAndMutual) return refs;
+	const out: Reference[] = [];
+	for (const r of refs) {
+		if (r.dir === "in") continue;
+		if (r.dir === "mutual") out.push({ ...r, dir: "out" });
+		else out.push(r);
+	}
+	return out;
 }

@@ -1,4 +1,4 @@
-import { ItemView, Keymap, Notice, TFile, WorkspaceLeaf, normalizePath } from "obsidian";
+import { ItemView, Keymap, Notice, WorkspaceLeaf, normalizePath } from "obsidian";
 import { layout, type PositionMap } from "./layout";
 import { CanvasRenderer } from "./render";
 import { attachKeyboardHandler } from "./ui/keyboard";
@@ -62,15 +62,18 @@ export class StumblespaceView extends ItemView {
 		this.renderer = new CanvasRenderer(this, this.canvasEl, svg);
 		attachKeyboardHandler(this, container);
 
-		// Follow active file. file-open fires when the file in a leaf changes
-		// (covers re-clicking the same leaf with a different file in file-nav).
-		// active-leaf-change covers switching between leaves.
-		this.registerEvent(
-			this.app.workspace.on("active-leaf-change", () => this.syncToActiveFile()),
-		);
-		this.registerEvent(
-			this.app.workspace.on("file-open", () => this.syncToActiveFile()),
-		);
+		this.applySettings();
+
+		// Follow active file only when the user opted into "active-file" mode.
+		// In "last-viewed" / "empty-splash" modes the canvas stays put on its
+		// initial state and doesn't react to leaf changes.
+		const onActiveChange = () => {
+			if (this.plugin.settings.openCanvasOn === "active-file") {
+				this.syncToActiveFile();
+			}
+		};
+		this.registerEvent(this.app.workspace.on("active-leaf-change", onActiveChange));
+		this.registerEvent(this.app.workspace.on("file-open", onActiveChange));
 
 		// Re-render on metadata updates. resolved fires after bulk resolution;
 		// changed fires per-file on edit — both route through RAF-throttled queueRender.
@@ -88,7 +91,32 @@ export class StumblespaceView extends ItemView {
 		ro.observe(this.canvasEl);
 		this.register(() => ro.disconnect());
 
-		this.syncToActiveFile();
+		this.applyOpenCanvasOn();
+	}
+
+	private applyOpenCanvasOn(): void {
+		const mode = this.plugin.settings.openCanvasOn;
+		if (mode === "active-file") this.syncToActiveFile();
+		else if (mode === "last-viewed") this.restoreLastViewed();
+		else this.showSplash("no-active");
+	}
+
+	private restoreLastViewed(): void {
+		const id = this.plugin.settings.lastViewedId;
+		const file = id ? this.plugin.index.getNote(id) : undefined;
+		if (id && file) {
+			this.state.currentId = id;
+			this.state.kbFocus = id;
+			this.queueRender();
+		} else {
+			this.syncToActiveFile();
+		}
+	}
+
+	applySettings(): void {
+		const ms = this.plugin.settings.animationDurationMs;
+		this.contentEl.style.setProperty("--ss-anim-duration", `${ms}ms`);
+		this.queueRender();
 	}
 
 	async onClose(): Promise<void> {
@@ -109,12 +137,13 @@ export class StumblespaceView extends ItemView {
 		if (!id) {
 			this.state.currentId = null;
 			this.state.kbFocus = null;
-			this.showSplash("no-id", file);
+			this.showSplash("no-id");
 			return;
 		}
 		if (id !== this.state.currentId) {
 			this.state.currentId = id;
 			this.state.kbFocus = id;
+			this.persistLastViewed(id);
 			this.queueRender();
 		}
 	}
@@ -143,6 +172,7 @@ export class StumblespaceView extends ItemView {
 			children,
 			grandchildrenByKid,
 			references: index.getReferences(id),
+			settings: this.plugin.settings,
 		});
 
 		this.state.lastPositions = positions;
@@ -217,6 +247,7 @@ export class StumblespaceView extends ItemView {
 		}
 		this.state.currentId = id;
 		this.state.kbFocus = id;
+		this.persistLastViewed(id);
 		this.queueRender();
 	}
 
@@ -225,7 +256,14 @@ export class StumblespaceView extends ItemView {
 		if (!prev) return;
 		this.state.currentId = prev;
 		this.state.kbFocus = prev;
+		this.persistLastViewed(prev);
 		this.queueRender();
+	}
+
+	private persistLastViewed(id: string): void {
+		if (this.plugin.settings.lastViewedId === id) return;
+		this.plugin.settings.lastViewedId = id;
+		void this.plugin.saveSettings({ skipNotify: true });
 	}
 
 	recenterOnKbFocus(): void {
@@ -262,10 +300,10 @@ export class StumblespaceView extends ItemView {
 	}
 
 	// Splash
-	private showSplash(mode: SplashMode, file?: TFile): void {
+	private showSplash(mode: SplashMode): void {
 		if (!this.canvasEl) return;
 		this.hideSplash();
-		this.splashEl = renderSplash(this, this.canvasEl, mode, file);
+		this.splashEl = renderSplash(this, this.canvasEl, mode);
 	}
 
 	private hideSplash(): void {
