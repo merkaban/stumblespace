@@ -7,6 +7,8 @@ export interface Position {
 	y: number;
 	role: Role;
 	dir?: Dir;
+	ghost?: boolean;
+	targetText?: string;
 }
 
 export type PositionMap = Map<string, Position>;
@@ -94,7 +96,8 @@ export function layout(input: LayoutInput): PositionMap {
 			const rOff = i % 2 === 1 ? 5 : 0;
 			const x = 50 + Math.cos(a) * (40 + rOff);
 			const y = 50 + Math.sin(a) * (37 + rOff);
-			pos.set(sorted[i]!.id, { x, y, role: "semantic", dir: sorted[i]!.dir });
+			const ref = sorted[i]!;
+			pos.set(ref.id, { x, y, role: "semantic", dir: ref.dir, ghost: ref.ghost, targetText: ref.targetText });
 		}
 	}
 

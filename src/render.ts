@@ -98,37 +98,60 @@ export class CanvasRenderer {
 			e.stopPropagation();
 			this.view.handleNodeClick(id, e);
 		});
+		// Middle-click → open in new tab (same as Mod+click)
+		this.view.registerDomEvent(el, "auxclick", (e: MouseEvent) => {
+			if (e.button !== 1) return;
+			e.preventDefault();
+			e.stopPropagation();
+			this.view.handleNodeMiddleClick(id);
+		});
 
 		return el;
 	}
 
-	private updateNodeEl(el: HTMLElement, id: string, pos: { x: number; y: number; role: string; dir?: string }, isNew: boolean): void {
+	private updateNodeEl(el: HTMLElement, id: string, pos: { x: number; y: number; role: string; dir?: string; ghost?: boolean; targetText?: string }, isNew: boolean): void {
 		const index = this.view.getIndex();
 		const file = index.getNote(id);
-		const title = file ? file.basename.replace(/^\S+\s/, "") : id;
+		let title: string;
+		if (file) {
+			title = file.basename.replace(/^\S+\s/, "");
+		} else if (pos.ghost) {
+			// Strip the ID prefix from the wikilink target to get the user-typed title.
+			const t = (pos.targetText ?? "").replace(/^\S+\s*/, "").trim();
+			title = t || "(no title)";
+		} else {
+			title = id;
+		}
 
 		el.querySelector(".ss-title")!.textContent = title;
-		el.setAttribute("aria-label", `Recenter on ${id} ${title}`);
+		el.setAttribute("aria-label",
+			pos.ghost ? `Create stub ${id}` : `Recenter on ${id} ${title}`);
 
 		// Build class list
 		const classes = ["ss-node"];
 		if (pos.role === "current") classes.push("ss-current");
 		if (pos.role === "ancestor" || pos.role === "child") classes.push("ss-spine");
 		if (pos.role === "sibling" || pos.role === "grandchild") classes.push("ss-spine", "ss-dim");
+		const badge = el.querySelector(".ss-leafbadge") as HTMLElement;
 		if (pos.role === "semantic") {
 			classes.push("ss-leaf");
 			if (pos.dir) classes.push(`ss-dir-${pos.dir}`);
-			const childCount = index.getChildren(id).length;
-			const badge = el.querySelector(".ss-leafbadge") as HTMLElement;
-			if (childCount > 0) {
-				classes.push("ss-has-children");
-				badge.textContent = `${childCount}\u2193`;
+			if (pos.ghost) {
+				classes.push("ss-ghost");
+				badge.textContent = "missing";
 				badge.style.display = "";
 			} else {
-				badge.style.display = "none";
+				const childCount = index.getChildren(id).length;
+				if (childCount > 0) {
+					classes.push("ss-has-children");
+					badge.textContent = `${childCount}\u2193`;
+					badge.style.display = "";
+				} else {
+					badge.style.display = "none";
+				}
 			}
 		} else {
-			(el.querySelector(".ss-leafbadge") as HTMLElement).style.display = "none";
+			badge.style.display = "none";
 		}
 
 		if (this.view.state.kbFocus === id) classes.push("ss-kb-focus");

@@ -5,6 +5,8 @@ import {
 	fzAncestors,
 	fzChildren,
 	fzSiblings,
+	parseIdFromFilename,
+	parseIdFromLinkText,
 } from "./folgezettel";
 
 describe("parseFz", () => {
@@ -99,5 +101,43 @@ describe("fzSiblings", () => {
 
 	it("returns empty for root", () => {
 		expect(fzSiblings("1.1", testIds)).toEqual([]);
+	});
+});
+
+describe("parseIdFromFilename", () => {
+	it("parses ID with title", () => {
+		expect(parseIdFromFilename("1.1a3 Some title")).toBe("1.1a3");
+	});
+
+	it("requires whitespace separator", () => {
+		expect(parseIdFromFilename("1.1a3")).toBeNull();
+	});
+
+	it("parses deep alternating", () => {
+		expect(parseIdFromFilename("2.17bc42 Title")).toBe("2.17bc42");
+	});
+
+	it("rejects non-Folgezettel", () => {
+		expect(parseIdFromFilename("README")).toBeNull();
+		expect(parseIdFromFilename("1d3 nope")).toBeNull();
+	});
+});
+
+describe("parseIdFromLinkText", () => {
+	it("parses bare ID", () => {
+		expect(parseIdFromLinkText("8.1")).toBe("8.1");
+	});
+
+	it("parses ID with title", () => {
+		expect(parseIdFromLinkText("8.1 test")).toBe("8.1");
+	});
+
+	it("parses alternating with title", () => {
+		expect(parseIdFromLinkText("1.1a3 Foo")).toBe("1.1a3");
+	});
+
+	it("rejects invalid form", () => {
+		expect(parseIdFromLinkText("nope")).toBeNull();
+		expect(parseIdFromLinkText("")).toBeNull();
 	});
 });

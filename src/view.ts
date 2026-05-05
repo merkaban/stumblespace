@@ -1,7 +1,8 @@
-import { ItemView, Keymap, WorkspaceLeaf } from "obsidian";
+import { ItemView, Keymap, Notice, TFile, WorkspaceLeaf, normalizePath } from "obsidian";
 import { layout, type PositionMap } from "./layout";
 import { CanvasRenderer } from "./render";
 import { attachKeyboardHandler } from "./ui/keyboard";
+import { renderSplash, type SplashMode } from "./ui/splash";
 import { parseIdFromFilename, VaultIndex } from "./graph/index";
 import type StumblespacePlugin from "./main";
 
@@ -69,9 +70,13 @@ export class StumblespaceView extends ItemView {
 			this.app.workspace.on("file-open", () => this.syncToActiveFile()),
 		);
 
-		// Re-render on index rebuild
+		// Re-render on metadata updates. resolved fires after bulk resolution;
+		// changed fires per-file on edit — both route through RAF-throttled queueRender.
 		this.registerEvent(
 			this.app.metadataCache.on("resolved", () => this.queueRender()),
+		);
+		this.registerEvent(
+			this.app.metadataCache.on("changed", () => this.queueRender()),
 		);
 
 		// Resize — ResizeObserver catches both window resize and pane drag
@@ -92,10 +97,17 @@ export class StumblespaceView extends ItemView {
 
 	private syncToActiveFile(): void {
 		const file = this.app.workspace.getActiveFile();
-		if (!file) return;
+		if (!file) {
+			this.state.currentId = null;
+			this.state.kbFocus = null;
+			this.showSplash("no-active");
+			return;
+		}
 		const id = parseIdFromFilename(file.basename);
 		if (!id) {
-			this.showSplash("Active file is not a Zettel");
+			this.state.currentId = null;
+			this.state.kbFocus = null;
+			this.showSplash("no-id", file);
 			return;
 		}
 		if (id !== this.state.currentId) {
@@ -146,6 +158,11 @@ export class StumblespaceView extends ItemView {
 	// --- Public actions (called by renderer and keyboard) ---
 
 	handleNodeClick(id: string, e: MouseEvent): void {
+		const pos = this.state.lastPositions.get(id);
+		if (pos?.ghost) {
+			this.handleGhostClick(id);
+			return;
+		}
 		if (Keymap.isModEvent(e)) {
 			// Mod+click → open in new tab
 			const file = this.plugin.index.getNote(id);
@@ -157,6 +174,38 @@ export class StumblespaceView extends ItemView {
 			return;
 		}
 		this.recenter(id);
+	}
+
+	handleNodeMiddleClick(id: string): void {
+		const pos = this.state.lastPositions.get(id);
+		if (pos?.ghost) {
+			this.handleGhostClick(id);
+			return;
+		}
+		const file = this.plugin.index.getNote(id);
+		if (file) this.app.workspace.openLinkText(file.path, "", true);
+	}
+
+	private async handleGhostClick(ghostId: string): Promise<void> {
+		const pos = this.state.lastPositions.get(ghostId);
+		const target = pos?.targetText ?? ghostId;
+		// targetText is the wikilink as typed: "<id>" or "<id> <title>".
+		// If just an ID, append a space so the regex still parses it as a Zettel.
+		const basename = target.includes(" ") ? target : `${target} `;
+
+		const currentFile = this.state.currentId
+			? this.plugin.index.getNote(this.state.currentId)
+			: null;
+		const folderPath = currentFile?.parent?.path ?? "";
+		const path = normalizePath(
+			(folderPath ? folderPath + "/" : "") + `${basename}.md`,
+		);
+		try {
+			await this.app.vault.create(path, "");
+			this.recenter(ghostId);
+		} catch (err) {
+			new Notice(`Create failed: ${err}`);
+		}
 	}
 
 	recenter(id: string): void {
@@ -204,12 +253,10 @@ export class StumblespaceView extends ItemView {
 	}
 
 	// Splash
-	private showSplash(message: string): void {
+	private showSplash(mode: SplashMode, file?: TFile): void {
 		if (!this.canvasEl) return;
 		this.hideSplash();
-		this.splashEl = this.canvasEl.createDiv({ cls: "ss-splash" });
-		this.splashEl.createEl("h3", { text: "No Zettel selected" });
-		this.splashEl.createEl("p", { text: message });
+		this.splashEl = renderSplash(this, this.canvasEl, mode, file);
 	}
 
 	private hideSplash(): void {

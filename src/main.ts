@@ -17,12 +17,16 @@ export default class StumblespacePlugin extends Plugin {
 			callback: () => this.activateView(),
 		});
 
-		// Vault subscriptions — debounced rebuild
+		// Vault subscriptions — debounced rebuild + notify open views
 		const scheduleRebuild = () => {
 			if (this.rebuildTimer !== null) window.clearTimeout(this.rebuildTimer);
 			this.rebuildTimer = window.setTimeout(() => {
 				this.index.rebuild();
 				this.rebuildTimer = null;
+				for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE)) {
+					const v = leaf.view;
+					if (v instanceof StumblespaceView) v.queueRender();
+				}
 			}, 250);
 		};
 

@@ -1,3 +1,18 @@
+const ID_FILENAME_RE = /^(\d+\.\d+(?:[a-z]+\d+)*[a-z]?)\s/;
+const ID_LINK_RE = /^(\d+\.\d+(?:[a-z]+\d+)*[a-z]?)(?:\s|$)/;
+
+/** Parse the ID prefix from a file basename. Requires "<id> <title>" form. */
+export function parseIdFromFilename(basename: string): string | null {
+	const m = basename.match(ID_FILENAME_RE);
+	return m ? m[1]! : null;
+}
+
+/** Lenient: accept either "<id>" alone or "<id> <title>" — used for wikilink targets. */
+export function parseIdFromLinkText(text: string): string | null {
+	const m = text.match(ID_LINK_RE);
+	return m ? m[1]! : null;
+}
+
 /**
  * Parse a Folgezettel ID into segments.
  * Format: "N." prefix + alternating number/letter groups.

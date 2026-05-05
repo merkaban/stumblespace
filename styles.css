@@ -202,6 +202,20 @@
 .ss-backbtn:hover { border-color: var(--ss-violet); color: var(--ss-ink); }
 .ss-hidden { opacity: 0; pointer-events: none; }
 
+/* Ghost (missing-target) nodes */
+.ss-ghost {
+	background: transparent;
+	border: 1px dashed color-mix(in srgb, var(--ss-amber) 65%, var(--ss-line));
+	box-shadow: none;
+	opacity: .8;
+}
+.ss-ghost .ss-title { color: var(--ss-ink3); font-style: italic; }
+.ss-ghost .ss-leafbadge {
+	color: var(--ss-amber);
+	border-color: color-mix(in srgb, var(--ss-amber) 50%, var(--ss-line));
+	background: color-mix(in srgb, var(--ss-amber) 8%, var(--background-primary));
+}
+
 /* Splash (empty state) */
 .ss-splash {
 	position: absolute;
@@ -210,13 +224,67 @@
 	transform: translate(-50%, -50%);
 	text-align: center;
 	color: var(--ss-ink3);
+	max-width: 80%;
 }
 .ss-splash h3 {
 	margin: 0 0 8px;
 	color: var(--ss-ink2);
 	font-size: 16px;
 }
-.ss-splash p { margin: 0; font-size: 13px; }
+.ss-splash p { margin: 0 0 12px; font-size: 13px; }
+
+.ss-splash-list {
+	list-style: none;
+	margin: 16px 0 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	max-height: 280px;
+	overflow-y: auto;
+}
+.ss-splash-item {
+	width: 100%;
+	background: var(--ss-panel);
+	border: 1px solid var(--ss-line);
+	border-radius: 6px;
+	padding: 6px 10px;
+	font-family: var(--ss-font);
+	font-size: 12px;
+	color: var(--ss-ink);
+	text-align: left;
+	cursor: pointer;
+}
+.ss-splash-item:hover {
+	border-color: var(--ss-violet);
+	background: color-mix(in srgb, var(--ss-violet) 8%, var(--ss-panel));
+}
+
+.ss-splash-action {
+	margin-top: 8px;
+	padding: 6px 14px;
+	background: var(--ss-violet);
+	color: #fff;
+	border: 0;
+	border-radius: 6px;
+	font-size: 12px;
+	cursor: pointer;
+}
+.ss-splash-action:hover { filter: brightness(1.1); }
+
+/* Modal inputs (Add ID, Ghost stub) */
+.ss-modal-input {
+	width: 100%;
+	margin-top: 8px;
+	padding: 6px 8px;
+	font-family: var(--ss-font);
+}
+.ss-modal-buttons {
+	display: flex;
+	gap: 8px;
+	justify-content: flex-end;
+	margin-top: 14px;
+}
 
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {

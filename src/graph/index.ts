@@ -1,13 +1,14 @@
 import { App, TFile } from "obsidian";
-import { fzAncestors, fzChildren, fzSiblings } from "./folgezettel";
+import {
+	fzAncestors,
+	fzChildren,
+	fzSiblings,
+	parseIdFromFilename,
+	parseIdFromLinkText,
+} from "./folgezettel";
 import { isFolgezettelRelative, type Dir, type Reference } from "./semantics";
 
-const ID_RE = /^(\d+\.\d+(?:[a-z]+\d+)*[a-z]?)\s/;
-
-export function parseIdFromFilename(basename: string): string | null {
-	const m = basename.match(ID_RE);
-	return m ? m[1]! : null;
-}
+export { parseIdFromFilename, parseIdFromLinkText };
 
 export class VaultIndex {
 	byId = new Map<string, TFile>();
@@ -100,6 +101,7 @@ export class VaultIndex {
 		// Merge and filter
 		const allLinked = new Set([...outgoing, ...incoming]);
 		const refs: Reference[] = [];
+		const seen = new Set<string>();
 		for (const otherId of allLinked) {
 			if (otherId === id) continue;
 			if (isFolgezettelRelative(id, otherId)) continue;
@@ -109,6 +111,24 @@ export class VaultIndex {
 			else if (outgoing.has(otherId)) dir = "out";
 			else dir = "in";
 			refs.push({ id: otherId, dir });
+			seen.add(otherId);
+		}
+
+		// Ghost references: unresolved wikilinks in current's body whose target text
+		// parses as a Folgezettel ID. Accept bare "<id>" or "<id> <title>" forms.
+		const unresolved = this.app.metadataCache.unresolvedLinks[file.path];
+		if (unresolved) {
+			for (const target of Object.keys(unresolved)) {
+				const ghostId = parseIdFromLinkText(target);
+				if (!ghostId) continue;
+				if (this.byId.has(ghostId)) continue;
+				if (ghostId === id) continue;
+				if (isFolgezettelRelative(id, ghostId)) continue;
+				if (sourceIds.has(ghostId)) continue;
+				if (seen.has(ghostId)) continue;
+				refs.push({ id: ghostId, dir: "out", ghost: true, targetText: target });
+				seen.add(ghostId);
+			}
 		}
 		return refs;
 	}

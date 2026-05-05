@@ -4,6 +4,10 @@ export type Dir = "out" | "in" | "mutual";
 export interface Reference {
 	id: string;
 	dir: Dir;
+	/** True if the link target doesn't resolve to a file in the vault. */
+	ghost?: boolean;
+	/** Original wikilink target text — set for ghosts so we can preserve the title. */
+	targetText?: string;
 }
 
 /**
