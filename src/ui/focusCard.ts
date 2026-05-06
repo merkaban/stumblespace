@@ -93,21 +93,22 @@ export class FocusCard extends Component {
 		const list = wrap.createEl("ul");
 
 		for (const entry of sources) {
-			// Obsidian may parse wikilinks in frontmatter as strings or as objects.
-			// Pull the link text out of either shape.
 			const linkText = extractSourceText(entry);
 			if (!linkText) continue;
 			const sourceId = parseIdFromFilename(linkText) ?? parseIdFromLinkText(linkText);
 			const item = list.createEl("li");
-			if (!sourceId || !this.view.getIndex().getNote(sourceId)) {
-				item.createSpan({ cls: "ss-fc-source ss-fc-source-missing", text: linkText });
-				continue;
-			}
 			const btn = item.createEl("button", { cls: "ss-fc-source", text: linkText });
-			this.registerDomEvent(btn, "click", () => {
-				this.view.closeFocusCard();
-				this.view.recenter(sourceId);
-			});
+			if (sourceId && this.view.getIndex().getNote(sourceId)) {
+				this.registerDomEvent(btn, "click", () => {
+					this.view.closeFocusCard();
+					this.view.recenter(sourceId);
+				});
+			} else {
+				this.registerDomEvent(btn, "click", () => {
+					this.view.closeFocusCard();
+					void this.view.app.workspace.openLinkText(linkText, file.path, false);
+				});
+			}
 		}
 	}
 
