@@ -131,7 +131,7 @@ export class CanvasRenderer {
 		if (titleEl) titleEl.textContent = title;
 		el.setAttribute("aria-label",
 			pos.moreCount ? `Show ${pos.moreCount} more grandchildren` :
-			pos.ghost ? `Create stub ${id}` : `Recenter on ${id} ${title}`);
+			pos.ghost ? `Create stub ${id}` : `${id} ${title}`);
 
 		// Build class list (preserve fading state during transition)
 		const classes = ["ss-node"];
