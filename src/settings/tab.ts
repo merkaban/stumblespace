@@ -53,5 +53,15 @@ export class StumblespaceSettingTab extends PluginSettingTab {
 						await save();
 					}),
 			);
+
+		new Setting(containerEl)
+			.setName("Open centered note in editor")
+			.setDesc("When you recenter the canvas, switch the active editor to that note.")
+			.addToggle((t) =>
+				t.setValue(s.openCenteredNoteInEditor).onChange(async (v) => {
+					s.openCenteredNoteInEditor = v;
+					await save();
+				}),
+			);
 	}
 }

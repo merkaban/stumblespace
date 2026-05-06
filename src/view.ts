@@ -257,6 +257,7 @@ export class StumblespaceView extends ItemView {
 		this.state.kbFocus = id;
 		this.persistLastViewed(id);
 		this.queueRender();
+		this.mirrorCenterToEditor(id);
 	}
 
 	goBack(): void {
@@ -266,6 +267,14 @@ export class StumblespaceView extends ItemView {
 		this.state.kbFocus = prev;
 		this.persistLastViewed(prev);
 		this.queueRender();
+		this.mirrorCenterToEditor(prev);
+	}
+
+	private mirrorCenterToEditor(id: string): void {
+		if (!this.plugin.settings.openCenteredNoteInEditor) return;
+		const file = this.plugin.index.getNote(id);
+		if (!file) return;
+		void this.app.workspace.openLinkText(file.path, "", false);
 	}
 
 	private persistLastViewed(id: string): void {
