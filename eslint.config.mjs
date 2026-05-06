@@ -5,6 +5,11 @@ import obsidianmd from "eslint-plugin-obsidianmd";
 export default [
 	...obsidianmd.configs.recommended,
 	{
+		// Tests and benches don't ship in main.js, so the obsidianmd rules
+		// (notably no-console) don't apply.
+		ignores: ["src/**/*.test.ts", "src/**/*.bench.test.ts"],
+	},
+	{
 		files: ["src/**/*.ts"],
 		languageOptions: {
 			parser: tsparser,
