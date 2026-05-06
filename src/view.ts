@@ -84,10 +84,10 @@ export class StumblespaceView extends ItemView {
 			this.app.metadataCache.on("changed", () => this.queueRender()),
 		);
 
-		// Resize — ResizeObserver catches both window resize and pane drag
-		const ro = new ResizeObserver(() => {
-			requestAnimationFrame(() => this.renderer?.redrawEdges());
-		});
+		// Resize — ResizeObserver catches both window resize and pane drag.
+		// Full re-layout (not just edges) because sib/child gaps depend on
+		// canvas width, so we need to recompute positions on resize.
+		const ro = new ResizeObserver(() => this.queueRender());
 		ro.observe(this.canvasEl);
 		this.register(() => ro.disconnect());
 
@@ -173,6 +173,7 @@ export class StumblespaceView extends ItemView {
 			grandchildrenByKid,
 			references: index.getReferences(id),
 			settings: this.plugin.settings,
+			canvasWidthPx: this.canvasEl.clientWidth,
 		});
 
 		this.state.lastPositions = positions;

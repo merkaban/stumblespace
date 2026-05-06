@@ -25,10 +25,18 @@ interface LayoutInput {
 	grandchildrenByKid: Map<string, string[]>;
 	references: Reference[];
 	settings: StumblespaceSettings;
+	/** Canvas width in px. Drives gap computation so siblings/children only
+	 * overlap when the canvas can't fit them side-by-side. Falls back to 1000
+	 * for tests / first paint before measurement. */
+	canvasWidthPx?: number;
 }
 
 const ARCS: [number, number][] = [[195, 265], [275, 345]];
 const DIR_ORDER: Record<Dir, number> = { out: 0, mutual: 1, in: 2 };
+
+const NODE_WIDTH_PX = 180;
+const NODE_GAP_PX = 12;
+const EDGE_PAD_PX = 12;
 
 export function layout(input: LayoutInput): PositionMap {
 	const pos: PositionMap = new Map();
@@ -41,12 +49,21 @@ export function layout(input: LayoutInput): PositionMap {
 		pos.set(input.ancestors[i]!, { x: 50, y: 50 - (i + 1) * 14, role: "ancestor" });
 	}
 
-	// Siblings: distribute evenly left and right of center, capped to fit
+	// Gap budget — anchored to actual canvas width so cards only overlap when
+	// there's no room left. Ideal = node footprint + small inter-node gap.
+	const canvasW = input.canvasWidthPx && input.canvasWidthPx > 0 ? input.canvasWidthPx : 1000;
+	const idealGapPct = ((NODE_WIDTH_PX + NODE_GAP_PX) / canvasW) * 100;
+	const safeMarginPct = ((NODE_WIDTH_PX / 2 + EDGE_PAD_PX) / canvasW) * 100;
+	const availablePct = Math.max(0, 50 - safeMarginPct);
+
+	// Siblings: distribute evenly left and right of center. Prefer ideal gap;
+	// compress only if the outermost would otherwise leave the canvas.
 	const sibs = input.siblings;
 	const leftSibs = sibs.filter((_, i) => i % 2 === 0);
 	const rightSibs = sibs.filter((_, i) => i % 2 === 1);
 	const maxSide = Math.max(leftSibs.length, rightSibs.length);
-	const sibGap = maxSide > 0 ? Math.min(18, 40 / maxSide) : 18;
+	const sibFitGap = maxSide > 0 ? availablePct / maxSide : idealGapPct;
+	const sibGap = Math.min(idealGapPct, sibFitGap);
 	for (let i = 0; i < leftSibs.length; i++) {
 		pos.set(leftSibs[i]!, { x: 50 - sibGap * (i + 1), y: 50, role: "sibling" });
 	}
@@ -55,10 +72,12 @@ export function layout(input: LayoutInput): PositionMap {
 	}
 
 	// Children fan at y=66 (moved up from 72 to give grandchildren more vertical
-	// room) — gap shrinks to keep outermost within [10, 90].
+	// room). Same rule: ideal gap by default, compress only to keep outermost
+	// within canvas bounds.
 	const kids = input.children;
 	const kidCount = kids.length;
-	const kidGap = kidCount > 1 ? Math.min(18, 80 / (kidCount - 1)) : 18;
+	const kidFitGap = kidCount > 1 ? (2 * availablePct) / (kidCount - 1) : idealGapPct;
+	const kidGap = Math.min(idealGapPct, kidFitGap);
 	for (let i = 0; i < kidCount; i++) {
 		const x = 50 + (i - (kidCount - 1) / 2) * kidGap;
 		pos.set(kids[i]!, { x, y: 66, role: "child" });
