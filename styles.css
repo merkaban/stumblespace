@@ -52,8 +52,9 @@
 	border: 1px solid var(--ss-line);
 	border-radius: 8px;
 	padding: 8px 11px;
-	min-width: 140px;
-	max-width: 200px;
+	width: 180px;
+	min-width: 180px;
+	max-width: 180px;
 	box-shadow: 0 8px 24px rgba(0, 0, 0, .35);
 	cursor: pointer;
 	transition: left var(--ss-anim-duration, 500ms) cubic-bezier(.65, .05, .36, 1),
@@ -75,6 +76,9 @@
 	font-size: 10.5px;
 	color: var(--ss-ink3);
 	letter-spacing: .04em;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 .ss-title {
 	font-size: 12.5px;
@@ -82,6 +86,9 @@
 	line-height: 1.35;
 	margin-top: 2px;
 	color: var(--ss-ink);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 /* Spine nodes */
@@ -102,13 +109,6 @@
 	z-index: 1;
 }
 .ss-current .ss-title { color: var(--ss-ink); font-weight: 600; }
-
-/* Grandchildren — fixed width so the column edges align cleanly. */
-.ss-grandchild {
-	width: 180px;
-	min-width: 180px;
-	max-width: 180px;
-}
 
 /* "+N more" indicator card — slot 4 when a kid has > 4 grandchildren.
    Click recenters on the kid so the full subtree is visible. */
