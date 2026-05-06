@@ -30,9 +30,9 @@ export class StumblespaceView extends ItemView {
 	private splashEl: HTMLElement | null = null;
 	private activeFocusCard: FocusCard | null = null;
 
-	constructor(leaf: WorkspaceLeaf) {
+	constructor(leaf: WorkspaceLeaf, plugin: StumblespacePlugin) {
 		super(leaf);
-		this.plugin = (this.app as any).plugins.plugins["stumblespace"] as StumblespacePlugin;
+		this.plugin = plugin;
 	}
 
 	getViewType(): string { return VIEW_TYPE; }
@@ -49,10 +49,10 @@ export class StumblespaceView extends ItemView {
 
 		// Canvas
 		this.canvasEl = container.createDiv({ cls: "ss-canvas" });
+		this.canvasEl.setAttribute("role", "application");
+		this.canvasEl.setAttribute("aria-roledescription", "Spatial folgezettel canvas");
 		this.canvasEl.createDiv({ cls: "ss-grain" });
-		const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-		svg.classList.add("ss-edges");
-		this.canvasEl.appendChild(svg);
+		const svg = this.canvasEl.createSvg("svg", { cls: "ss-edges" });
 
 		// Back button
 		const backBtn = this.canvasEl.createEl("button", { cls: "ss-backbtn ss-hidden", text: "\u2190 back" });
@@ -191,14 +191,21 @@ export class StumblespaceView extends ItemView {
 
 	handleNodeClick(id: string, e: MouseEvent): void {
 		const pos = this.state.lastPositions.get(id);
+		if (pos?.moreCount) {
+			// Synthetic "+N more" indicator — recenter on the kid so the
+			// hidden grandchildren become visible as direct children.
+			const kidId = id.replace(/__more$/, "");
+			this.recenter(kidId);
+			return;
+		}
 		if (pos?.ghost) {
-			this.handleGhostClick(id);
+			void this.handleGhostClick(id);
 			return;
 		}
 		if (Keymap.isModEvent(e)) {
 			// Mod+click → open in new tab
 			const file = this.plugin.index.getNote(id);
-			if (file) this.app.workspace.openLinkText(file.path, "", true);
+			if (file) void this.app.workspace.openLinkText(file.path, "", true);
 			return;
 		}
 		if (id === this.state.currentId) {
@@ -211,11 +218,11 @@ export class StumblespaceView extends ItemView {
 	handleNodeMiddleClick(id: string): void {
 		const pos = this.state.lastPositions.get(id);
 		if (pos?.ghost) {
-			this.handleGhostClick(id);
+			void this.handleGhostClick(id);
 			return;
 		}
 		const file = this.plugin.index.getNote(id);
-		if (file) this.app.workspace.openLinkText(file.path, "", true);
+		if (file) void this.app.workspace.openLinkText(file.path, "", true);
 	}
 
 	private async handleGhostClick(ghostId: string): Promise<void> {
@@ -236,7 +243,7 @@ export class StumblespaceView extends ItemView {
 			await this.app.vault.create(path, "");
 			this.recenter(ghostId);
 		} catch (err) {
-			new Notice(`Create failed: ${err}`);
+			new Notice(`Create failed: ${String(err)}`);
 		}
 	}
 

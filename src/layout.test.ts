@@ -42,10 +42,10 @@ describe("layout", () => {
 		expect(pos.has("1.0")).toBe(false);
 	});
 
-	it("fans children at y=72", () => {
+	it("fans children at y=66", () => {
 		const pos = layout(baseInput);
 		for (const kid of baseInput.children) {
-			expect(pos.get(kid)?.y).toBe(72);
+			expect(pos.get(kid)?.y).toBe(66);
 			expect(pos.get(kid)?.role).toBe("child");
 		}
 	});
@@ -81,7 +81,72 @@ describe("layout", () => {
 		};
 		const pos = layout(input);
 		expect(pos.get("1.1a3a1")?.role).toBe("grandchild");
-		expect(pos.get("1.1a3a1")?.y).toBe(90);
+		expect(pos.get("1.1a3a1")?.y).toBe(80);
+	});
+
+	it("stacks grandchildren vertically under their kid with fixed gap", () => {
+		const input = {
+			...baseInput,
+			children: ["1.1a3a", "1.1a3b"],
+			grandchildrenByKid: new Map([
+				["1.1a3a", ["1.1a3a1", "1.1a3a2", "1.1a3a3", "1.1a3a4"]],
+			]),
+		};
+		const pos = layout(input);
+		const kidX = pos.get("1.1a3a")!.x;
+		// All grandchildren share their kid's x — column-aligned.
+		for (const id of ["1.1a3a1", "1.1a3a2", "1.1a3a3", "1.1a3a4"]) {
+			expect(pos.get(id)?.x).toBe(kidX);
+		}
+		// y values increase by exactly 6 each — fixed gap.
+		expect(pos.get("1.1a3a1")?.y).toBe(80);
+		expect(pos.get("1.1a3a2")?.y).toBe(86);
+		expect(pos.get("1.1a3a3")?.y).toBe(92);
+		expect(pos.get("1.1a3a4")?.y).toBe(98);
+	});
+
+	it("caps grandchildren at 4 with a +N more indicator when more exist", () => {
+		const input = {
+			...baseInput,
+			children: ["1.1a3a", "1.1a3b"],
+			grandchildrenByKid: new Map([
+				["1.1a3a", ["g1", "g2", "g3", "g4", "g5", "g6"]],
+			]),
+		};
+		const pos = layout(input);
+		// First 3 visible as real grandchildren.
+		expect(pos.has("g1")).toBe(true);
+		expect(pos.has("g2")).toBe(true);
+		expect(pos.has("g3")).toBe(true);
+		// Slots 4–6 hidden behind indicator.
+		expect(pos.has("g4")).toBe(false);
+		expect(pos.has("g5")).toBe(false);
+		expect(pos.has("g6")).toBe(false);
+		// Indicator at slot 4 (y=98) with moreCount = 4 (g3..g6 hidden? actually visible=3, hidden=3+).
+		const more = pos.get("1.1a3a__more");
+		expect(more).toBeDefined();
+		expect(more?.y).toBe(98);
+		expect(more?.moreCount).toBe(3);
+	});
+
+	it("keeps halo nodes within [10, 90]", () => {
+		const refs: { id: string; dir: "out" | "mutual" | "in" }[] = Array.from(
+			{ length: 12 },
+			(_, i) => ({
+				id: `R${i}`,
+				dir: i % 3 === 0 ? "out" : i % 3 === 1 ? "mutual" : "in",
+			}),
+		);
+		const input = { ...baseInput, references: refs };
+		const pos = layout(input);
+		for (const r of refs) {
+			const p = pos.get(r.id);
+			expect(p, `position for ${r.id}`).toBeDefined();
+			expect(p!.x).toBeGreaterThanOrEqual(10);
+			expect(p!.x).toBeLessThanOrEqual(90);
+			expect(p!.y).toBeGreaterThanOrEqual(10);
+			expect(p!.y).toBeLessThanOrEqual(90);
+		}
 	});
 
 	it("places semantic refs on halo, grouped by direction", () => {

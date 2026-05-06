@@ -63,7 +63,7 @@ export class FocusCard extends Component {
 			const content = await this.view.app.vault.cachedRead(file);
 			await MarkdownRenderer.render(this.view.app, content, body, file.path, this);
 		} catch (err) {
-			new Notice(`Render failed: ${err}`);
+			new Notice(`Render failed: ${String(err)}`);
 		}
 
 		// Sources
@@ -100,7 +100,7 @@ export class FocusCard extends Component {
 			const sourceId = parseIdFromFilename(linkText) ?? parseIdFromLinkText(linkText);
 			const item = list.createEl("li");
 			if (!sourceId || !this.view.getIndex().getNote(sourceId)) {
-				item.createEl("span", { cls: "ss-fc-source ss-fc-source-missing", text: linkText });
+				item.createSpan({ cls: "ss-fc-source ss-fc-source-missing", text: linkText });
 				continue;
 			}
 			const btn = item.createEl("button", { cls: "ss-fc-source", text: linkText });
@@ -112,7 +112,9 @@ export class FocusCard extends Component {
 	}
 
 	private handleBodyClick(e: MouseEvent, file: TFile): void {
-		const a = (e.target as HTMLElement).closest("a.internal-link") as HTMLElement | null;
+		const target = e.target;
+		if (!(target instanceof HTMLElement)) return;
+		const a = target.closest("a.internal-link");
 		if (!a) return;
 
 		const href = a.getAttribute("data-href") ?? a.getAttribute("href") ?? "";
@@ -124,7 +126,7 @@ export class FocusCard extends Component {
 
 		// Mod+click → open in new tab; card stays put.
 		if (Keymap.isModEvent(e)) {
-			this.view.app.workspace.openLinkText(href, file.path, true);
+			void this.view.app.workspace.openLinkText(href, file.path, true);
 			return;
 		}
 
@@ -138,7 +140,7 @@ export class FocusCard extends Component {
 			this.view.closeFocusCard();
 			this.view.recenter(targetId);
 		} else {
-			this.view.app.workspace.openLinkText(href, file.path, false);
+			void this.view.app.workspace.openLinkText(href, file.path, false);
 		}
 	}
 }

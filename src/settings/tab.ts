@@ -41,11 +41,11 @@ export class StumblespaceSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Open canvas on")
-			.setDesc("Which Zettel the canvas centers on when opened.")
+			.setDesc("Which zettel the canvas centers on when opened.")
 			.addDropdown((d) =>
 				d
 					.addOption("active-file", "Active file")
-					.addOption("last-viewed", "Last viewed Zettel")
+					.addOption("last-viewed", "Last viewed zettel")
 					.addOption("empty-splash", "Empty splash")
 					.setValue(s.openCanvasOn)
 					.onChange(async (v) => {

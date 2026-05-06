@@ -53,7 +53,12 @@ export class VaultIndex {
 		const file = this.byId.get(id);
 		if (!file) return [];
 		const cache = this.app.metadataCache.getFileCache(file);
-		const sources: unknown[] = cache?.frontmatter?.sources ?? [];
+		const fm: unknown = cache?.frontmatter;
+		let sources: unknown[] = [];
+		if (fm && typeof fm === "object" && "sources" in fm) {
+			const raw = (fm as Record<string, unknown>).sources;
+			if (Array.isArray(raw)) sources = raw;
+		}
 		const out: string[] = [];
 		for (const entry of sources) {
 			if (typeof entry !== "string") continue;

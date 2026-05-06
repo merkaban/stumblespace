@@ -11,8 +11,8 @@ export function renderSplash(
 	const el = container.createDiv({ cls: "ss-splash" });
 
 	if (mode === "no-active") {
-		el.createEl("h3", { text: "No Zettel selected" });
-		el.createEl("p", { text: "Open a note with a Folgezettel filename prefix, or pick a root below." });
+		el.createEl("h3", { text: "No zettel selected" });
+		el.createEl("p", { text: "Open a note with a folgezettel filename prefix, or pick a root below." });
 
 		const roots = collectRoots(view);
 		if (roots.length > 0) {
@@ -29,8 +29,8 @@ export function renderSplash(
 			}
 		}
 	} else {
-		el.createEl("h3", { text: "Active file is not a Zettel" });
-		el.createEl("p", { text: "Rename the file with a Folgezettel prefix like “1.1a Title.md”." });
+		el.createEl("h3", { text: "Active file is not a zettel" });
+		el.createEl("p", { text: "Rename the file with a folgezettel prefix like “1.1a Title.md”." });
 	}
 
 	return el;

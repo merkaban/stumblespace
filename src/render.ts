@@ -2,7 +2,6 @@ import { fzParent } from "./graph/folgezettel";
 import type { PositionMap } from "./layout";
 import type { StumblespaceView } from "./view";
 
-const NS_SVG = "http://www.w3.org/2000/svg";
 const SPINE_ROLES = new Set(["current", "ancestor", "sibling", "child", "grandchild"]);
 
 export class CanvasRenderer {
@@ -49,11 +48,11 @@ export class CanvasRenderer {
 			if (!visibleIds.has(id)) {
 				// If a fading node holds focus, hand it back to the view container
 				// so keyboard handler keeps receiving events.
-				if (el === document.activeElement || el.contains(document.activeElement)) {
+				const active = activeDocument.activeElement;
+				if (el === active || el.contains(active)) {
 					this.view.contentEl.focus({ preventScroll: true });
 				}
-				el.style.opacity = "0";
-				el.style.pointerEvents = "none";
+				el.addClass("ss-fading");
 				const existing = this.fadeTimers.get(id);
 				if (existing !== undefined) window.clearTimeout(existing);
 				const timer = window.setTimeout(() => {
@@ -83,14 +82,12 @@ export class CanvasRenderer {
 	}
 
 	private createNodeEl(id: string): HTMLElement {
-		const el = this.canvas.createDiv({ cls: "ss-node" });
+		const el = this.canvas.createDiv({ cls: "ss-node ss-fading" });
 		el.createDiv({ cls: "ss-id", text: id });
 		el.createDiv({ cls: "ss-title" });
-		el.createDiv({ cls: "ss-leafbadge" });
+		el.createDiv({ cls: "ss-leafbadge ss-hidden" });
 
-		el.style.left = "50%";
-		el.style.top = "50%";
-		el.style.opacity = "0";
+		el.setCssStyles({ left: "50%", top: "50%" });
 		el.setAttribute("role", "button");
 		el.setAttribute("tabindex", "0");
 
@@ -109,50 +106,60 @@ export class CanvasRenderer {
 		return el;
 	}
 
-	private updateNodeEl(el: HTMLElement, id: string, pos: { x: number; y: number; role: string; dir?: string; ghost?: boolean; targetText?: string }, isNew: boolean): void {
+	private updateNodeEl(el: HTMLElement, id: string, pos: { x: number; y: number; role: string; dir?: string; ghost?: boolean; targetText?: string; moreCount?: number }, isNew: boolean): void {
 		const index = this.view.getIndex();
 		const file = index.getNote(id);
+		const idEl = el.querySelector(".ss-id");
 		let title: string;
-		if (file) {
+		if (pos.moreCount) {
+			title = `+${pos.moreCount} more`;
+			if (idEl) idEl.textContent = "";
+		} else if (file) {
 			title = file.basename.replace(/^\S+\s/, "");
+			if (idEl) idEl.textContent = id;
 		} else if (pos.ghost) {
 			// Strip the ID prefix from the wikilink target to get the user-typed title.
 			const t = (pos.targetText ?? "").replace(/^\S+\s*/, "").trim();
 			title = t || "(no title)";
+			if (idEl) idEl.textContent = id;
 		} else {
 			title = id;
+			if (idEl) idEl.textContent = id;
 		}
 
-		el.querySelector(".ss-title")!.textContent = title;
+		const titleEl = el.querySelector(".ss-title");
+		if (titleEl) titleEl.textContent = title;
 		el.setAttribute("aria-label",
+			pos.moreCount ? `Show ${pos.moreCount} more grandchildren` :
 			pos.ghost ? `Create stub ${id}` : `Recenter on ${id} ${title}`);
 
-		// Build class list
+		// Build class list (preserve fading state during transition)
 		const classes = ["ss-node"];
 		if (pos.role === "current") classes.push("ss-current");
 		if (pos.role === "ancestor" || pos.role === "child") classes.push("ss-spine");
-		if (pos.role === "sibling" || pos.role === "grandchild") classes.push("ss-spine", "ss-dim");
-		const badge = el.querySelector(".ss-leafbadge") as HTMLElement;
+		if (pos.role === "sibling") classes.push("ss-spine");
+		if (pos.role === "grandchild") classes.push("ss-spine", "ss-grandchild");
+		if (pos.moreCount) classes.push("ss-grandchild-more");
+
+		const badge = el.querySelector(".ss-leafbadge");
+		let badgeVisible = false;
 		if (pos.role === "semantic") {
 			classes.push("ss-leaf");
 			if (pos.dir) classes.push(`ss-dir-${pos.dir}`);
 			if (pos.ghost) {
 				classes.push("ss-ghost");
-				badge.textContent = "missing";
-				badge.style.display = "";
+				if (badge) badge.textContent = "Missing";
+				badgeVisible = true;
 			} else {
 				const childCount = index.getChildren(id).length;
 				if (childCount > 0) {
 					classes.push("ss-has-children");
-					badge.textContent = `${childCount}\u2193`;
-					badge.style.display = "";
-				} else {
-					badge.style.display = "none";
+					if (badge) badge.textContent = `${childCount}↓`;
+					badgeVisible = true;
 				}
 			}
-		} else {
-			badge.style.display = "none";
 		}
+		if (badge) badge.toggleClass("ss-hidden", !badgeVisible);
 
 		if (this.view.state.kbFocus === id) classes.push("ss-kb-focus");
 		el.className = classes.join(" ");
@@ -169,15 +176,13 @@ export class CanvasRenderer {
 			existingBtn.remove();
 		}
 
-		el.style.left = pos.x + "%";
-		el.style.top = pos.y + "%";
-		el.style.pointerEvents = "";
+		el.setCssStyles({ left: `${pos.x}%`, top: `${pos.y}%` });
+
 		if (isNew) {
-			// Defer opacity to next frame so the CSS transition from 0 \u2192 1 plays.
-			requestAnimationFrame(() => { el.style.opacity = "1"; });
+			// Defer reveal to next frame so the CSS opacity transition (0 → 1) plays.
+			requestAnimationFrame(() => { el.removeClass("ss-fading"); });
 		} else {
-			// Existing node: set opacity sync to override any stale fade state.
-			el.style.opacity = "1";
+			el.removeClass("ss-fading");
 		}
 	}
 
@@ -188,22 +193,33 @@ export class CanvasRenderer {
 		const h = this.canvas.clientHeight;
 		if (w === 0 || h === 0) return;
 
-		// Create SVG marker defs
-		const defs = document.createElementNS(NS_SVG, "defs");
-		defs.appendChild(this.createMarker("ss-arr", "auto"));
-		defs.appendChild(this.createMarker("ss-arr-rev", "auto-start-reverse"));
-		this.svg.appendChild(defs);
+		// SVG marker defs — reusable arrowheads for direction-aware edges.
+		const defs = this.svg.createSvg("defs");
+		this.createMarker(defs, "ss-arr", "auto");
+		this.createMarker(defs, "ss-arr-rev", "auto-start-reverse");
 
 		const px = (id: string) => {
-			const p = positions.get(id)!;
+			const p = positions.get(id);
+			if (!p) return { x: 0, y: 0 };
 			return { x: (p.x * w) / 100, y: (p.y * h) / 100 };
 		};
 
-		// Spine edges (folgezettel parent→child)
+		// Spine edges (folgezettel parent→child).
+		// kid→grandchild gets fan-attach geometry so each grandchild's edge
+		// arrives at a distinct x along its top border — readable even when
+		// grandchildren stack tightly in a single column.
 		for (const [id, p] of positions) {
+			if (p.moreCount) continue;  // indicator slot, no spine edge
 			const parent = fzParent(id);
 			if (!parent || !positions.has(parent)) continue;
-			if (!SPINE_ROLES.has(p.role) || !SPINE_ROLES.has(positions.get(parent)!.role)) continue;
+			const parentPos = positions.get(parent);
+			if (!parentPos) continue;
+			if (!SPINE_ROLES.has(p.role) || !SPINE_ROLES.has(parentPos.role)) continue;
+
+			if (parentPos.role === "child" && p.role === "grandchild") {
+				this.drawGrandchildEdge(w, h, parent, id, parentPos, p);
+				continue;
+			}
 
 			const a = px(parent);
 			const b = px(id);
@@ -223,13 +239,12 @@ export class CanvasRenderer {
 				const topAncCenterPx = (22 * h) / 100;
 				const yBot = topAncCenterPx - 26;
 				const yTop = yBot - Math.min(70, h * 0.1);
-				const line = document.createElementNS(NS_SVG, "line");
+				const line = this.svg.createSvg("line");
 				this.setSvgAttrs(line, {
 					x1: xPx, y1: yBot, x2: xPx, y2: yTop,
 					stroke: "var(--ss-violet)", "stroke-width": "1.6",
 					"stroke-dasharray": "2 4", opacity: ".6", "stroke-linecap": "round",
 				});
-				this.svg.appendChild(line);
 			}
 		}
 
@@ -277,27 +292,89 @@ export class CanvasRenderer {
 		}
 	}
 
-	private createMarker(id: string, orient: string): SVGMarkerElement {
-		const marker = document.createElementNS(NS_SVG, "marker") as SVGMarkerElement;
-		this.setSvgAttrs(marker, {
-			id, viewBox: "0 0 10 10", refX: 9, refY: 5,
-			markerWidth: 5, markerHeight: 5, orient,
+	/**
+	 * Kid → grandchild edge with fan-out attachment along the grandchild's
+	 * top border. Uses layout-target percentages × canvas pixels rather than
+	 * getBoundingClientRect, so animated transitions don't pull the edge to
+	 * an interpolated visual position.
+	 */
+	private drawGrandchildEdge(
+		canvasW: number,
+		canvasH: number,
+		kidId: string,
+		gcId: string,
+		kidPos: { x: number; y: number },
+		gcPos: { x: number; y: number },
+	): void {
+		const kidEl = this.nodeEls.get(kidId);
+		const gcEl = this.nodeEls.get(gcId);
+		if (!kidEl || !gcEl) return;
+
+		const kidH = kidEl.clientHeight;
+		const gcW = gcEl.clientWidth;
+		const gcH = gcEl.clientHeight;
+
+		const kidCenterX = (kidPos.x / 100) * canvasW;
+		const kidCenterY = (kidPos.y / 100) * canvasH;
+		const gcCenterX = (gcPos.x / 100) * canvasW;
+		const gcCenterY = (gcPos.y / 100) * canvasH;
+
+		const cBotX = kidCenterX;
+		const cBotY = kidCenterY + kidH / 2;
+		const gx = gcCenterX - gcW / 2;
+		const gy = gcCenterY - gcH / 2;
+		const gw = gcW;
+
+		// Find grandchild index within its kid's children.
+		const siblings = this.view.getIndex().getChildren(kidId);
+		const n = siblings.length;
+		const gi = siblings.indexOf(gcId);
+
+		const gcCenter = gx + gw / 2;
+		const dx = gcCenter - cBotX;
+		const horizSpread = Math.max(120, gw * 1.2);
+		const tHoriz = Math.max(-1, Math.min(1, dx / horizSpread));
+		const tRow = n > 1 ? (gi / (n - 1)) * 2 - 1 : 0;
+		const t = tHoriz * 0.4 + tRow * 0.6;
+
+		const ATTACH_SPREAD = 0.7;
+		const range = ATTACH_SPREAD * 0.5;
+		const attachT = 0.5 - t * range;
+		const attachX = gx + gw * attachT;
+		const attachY = gy;
+
+		const dy = Math.max(40, attachY - cBotY);
+		const cy1 = cBotY + dy * 0.55;
+		const cy2 = attachY - dy * 0.25;
+
+		const d = `M${cBotX},${cBotY} C${cBotX},${cy1} ${attachX},${cy2} ${attachX},${attachY}`;
+		this.svgPath(d, {
+			stroke: "var(--ss-violet)",
+			"stroke-width": "1.7",
+			fill: "none",
+			opacity: ".8",
 		});
-		const path = document.createElementNS(NS_SVG, "path");
-		path.setAttribute("d", "M0,0 L10,5 L0,10 z");
-		path.style.fill = "currentColor";
-		marker.appendChild(path);
+	}
+
+	private createMarker(parent: SVGElement, id: string, orient: string): SVGMarkerElement {
+		const marker = parent.createSvg("marker", {
+			attr: {
+				id, viewBox: "0 0 10 10", refX: 9, refY: 5,
+				markerWidth: 5, markerHeight: 5, orient,
+			},
+		});
+		marker.createSvg("path", {
+			attr: { d: "M0,0 L10,5 L0,10 z", fill: "currentColor" },
+		});
 		return marker;
 	}
 
 	private svgPath(d: string, attrs: Record<string, string | number>): void {
-		const path = document.createElementNS(NS_SVG, "path");
-		path.setAttribute("d", d);
+		const path = this.svg.createSvg("path", { attr: { d } });
 		this.setSvgAttrs(path, attrs);
-		this.svg.appendChild(path);
 	}
 
-	/** Set SVG attributes — uses style for paint properties that may contain var(). */
+	/** Set SVG attributes — paint props go through style.setProperty so var() resolves. */
 	private setSvgAttrs(el: SVGElement, attrs: Record<string, string | number>): void {
 		const STYLE_PROPS = new Set(["stroke", "fill", "color", "opacity", "stroke-width",
 			"stroke-dasharray", "stroke-linecap"]);

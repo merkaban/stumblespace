@@ -14,7 +14,7 @@ export default class StumblespacePlugin extends Plugin {
 
 		this.index = new VaultIndex(this.app);
 
-		this.registerView(VIEW_TYPE, (leaf) => new StumblespaceView(leaf));
+		this.registerView(VIEW_TYPE, (leaf) => new StumblespaceView(leaf, this));
 
 		this.addCommand({
 			id: "open-canvas",
@@ -46,7 +46,8 @@ export default class StumblespacePlugin extends Plugin {
 	}
 
 	async loadSettings(): Promise<void> {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		const data = (await this.loadData()) as Partial<StumblespaceSettings> | null;
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, data);
 	}
 
 	async saveSettings(opts?: { skipNotify?: boolean }): Promise<void> {
@@ -69,6 +70,6 @@ export default class StumblespacePlugin extends Plugin {
 			leaf = newLeaf;
 		}
 
-		workspace.revealLeaf(leaf);
+		await workspace.revealLeaf(leaf);
 	}
 }

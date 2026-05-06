@@ -60,6 +60,10 @@
 		top var(--ss-anim-duration, 500ms) cubic-bezier(.65, .05, .36, 1),
 		opacity .35s, transform .15s, border-color .15s;
 }
+.ss-node.ss-fading {
+	opacity: 0;
+	pointer-events: none;
+}
 .ss-node:hover {
 	border-color: var(--ss-ink3);
 	z-index: 50;
@@ -99,8 +103,24 @@
 }
 .ss-current .ss-title { color: var(--ss-ink); font-weight: 600; }
 
-/* Dimmed nodes (siblings, grandchildren) */
-.ss-dim { opacity: .65; }
+/* Grandchildren — fixed width so the column edges align cleanly. */
+.ss-grandchild {
+	width: 180px;
+	min-width: 180px;
+	max-width: 180px;
+}
+
+/* "+N more" indicator card — slot 4 when a kid has > 4 grandchildren.
+   Click recenters on the kid so the full subtree is visible. */
+.ss-grandchild-more {
+	border-style: dashed;
+	background: transparent;
+	color: var(--ss-ink2);
+	font-style: italic;
+	text-align: center;
+}
+.ss-grandchild-more .ss-title { color: var(--ss-ink2); font-weight: 500; }
+.ss-grandchild-more:hover { border-color: var(--ss-violet); color: var(--ss-ink); }
 
 /* Leaf badge */
 .ss-leafbadge {
@@ -166,21 +186,16 @@
 }
 .ss-expandbtn:hover { transform: scale(1.1); }
 
-/* Keyboard focus ring */
-.ss-kb-focus { z-index: 50; }
-.ss-kb-focus::before {
-	content: "";
-	position: absolute;
-	inset: -6px;
-	border-radius: 11px;
-	border: 1.5px dashed var(--ss-ink);
-	opacity: .75;
-	pointer-events: none;
+/* Keyboard focus ring — uses CSS outline so high-contrast mode preserves it. */
+.ss-kb-focus {
+	z-index: 50;
+	outline: 2px dashed var(--ss-ink);
+	outline-offset: 4px;
 	animation: ss-kbpulse 1.6s ease-in-out infinite;
 }
 @keyframes ss-kbpulse {
-	0%, 100% { opacity: .45; }
-	50% { opacity: .9; }
+	0%, 100% { outline-color: color-mix(in srgb, var(--ss-ink) 45%, transparent); }
+	50%      { outline-color: color-mix(in srgb, var(--ss-ink) 90%, transparent); }
 }
 
 /* Back button */
@@ -360,5 +375,5 @@
 @media (prefers-reduced-motion: reduce) {
 	.ss-node { transition: opacity .15s; }
 	.ss-edges path, .ss-edges line { transition: none; }
-	.ss-kb-focus::before { animation: none; opacity: .75; }
+	.ss-kb-focus { animation: none; }
 }

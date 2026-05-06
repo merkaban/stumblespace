@@ -10,6 +10,8 @@ export interface Position {
 	dir?: Dir;
 	ghost?: boolean;
 	targetText?: string;
+	/** Count of hidden grandchildren when this slot stands in for them. */
+	moreCount?: number;
 }
 
 export type PositionMap = Map<string, Position>;
@@ -52,24 +54,46 @@ export function layout(input: LayoutInput): PositionMap {
 		pos.set(rightSibs[i]!, { x: 50 + sibGap * (i + 1), y: 50, role: "sibling" });
 	}
 
-	// Children fan at y=72 — gap shrinks to keep outermost within [10, 90]
+	// Children fan at y=66 (moved up from 72 to give grandchildren more vertical
+	// room) — gap shrinks to keep outermost within [10, 90].
 	const kids = input.children;
 	const kidCount = kids.length;
 	const kidGap = kidCount > 1 ? Math.min(18, 80 / (kidCount - 1)) : 18;
 	for (let i = 0; i < kidCount; i++) {
 		const x = 50 + (i - (kidCount - 1) / 2) * kidGap;
-		pos.set(kids[i]!, { x, y: 72, role: "child" });
+		pos.set(kids[i]!, { x, y: 66, role: "child" });
 	}
 
-	// Grandchildren at y=90, only when ≤2 children
+	// Grandchildren — only when current has ≤2 children. Each kid's
+	// grandchildren stack vertically directly under the kid with a fixed gap.
+	// Cap visible at 4: if more exist, show first 3 + a synthetic "+N more"
+	// indicator at slot 4. Synthetic id format: "<kidId>__more".
 	if (kidCount <= 2) {
+		const baseY = 80;
+		const rowSpacing = 6;
+		const MAX_VISIBLE = 4;
 		for (const kid of kids) {
-			const gks = input.grandchildrenByKid.get(kid!) ?? [];
-			const kidPos = pos.get(kid!);
-			if (!kidPos) continue;
-			for (let i = 0; i < gks.length; i++) {
-				const x = kidPos.x + (i - (gks.length - 1) / 2) * 14;
-				pos.set(gks[i]!, { x, y: 90, role: "grandchild" });
+			const gks = input.grandchildrenByKid.get(kid) ?? [];
+			const kidPos = pos.get(kid);
+			if (!kidPos || gks.length === 0) continue;
+
+			const overflow = gks.length > MAX_VISIBLE;
+			const visibleCount = overflow ? MAX_VISIBLE - 1 : gks.length;
+
+			for (let i = 0; i < visibleCount; i++) {
+				pos.set(gks[i]!, {
+					x: kidPos.x,
+					y: baseY + i * rowSpacing,
+					role: "grandchild",
+				});
+			}
+			if (overflow) {
+				pos.set(`${kid}__more`, {
+					x: kidPos.x,
+					y: baseY + (MAX_VISIBLE - 1) * rowSpacing,
+					role: "grandchild",
+					moreCount: gks.length - visibleCount,
+				});
 			}
 		}
 	}
@@ -98,8 +122,11 @@ export function layout(input: LayoutInput): PositionMap {
 			}
 			const a = (ang * Math.PI) / 180;
 			const rOff = i % 2 === 1 ? 5 : 0;
-			const x = 50 + Math.cos(a) * (40 + rOff);
-			const y = 50 + Math.sin(a) * (37 + rOff);
+			const rawX = 50 + Math.cos(a) * (40 + rOff);
+			const rawY = 50 + Math.sin(a) * (37 + rOff);
+			// Clamp to safe canvas zone so cards never cross the viewport edge.
+			const x = Math.max(10, Math.min(90, rawX));
+			const y = Math.max(10, Math.min(90, rawY));
 			const ref = sorted[i]!;
 			pos.set(ref.id, { x, y, role: "semantic", dir: ref.dir, ghost: ref.ghost, targetText: ref.targetText });
 		}
