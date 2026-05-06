@@ -164,15 +164,16 @@ export class CanvasRenderer {
 		if (this.view.state.kbFocus === id) classes.push("ss-kb-focus");
 		el.className = classes.join(" ");
 
-		// Expand button on current node
+		// Expand button on every real note node (skip ghosts + "+N more" placeholders).
 		const existingBtn = el.querySelector(".ss-expandbtn");
-		if (pos.role === "current" && !existingBtn) {
+		const showBtn = !pos.ghost && !pos.moreCount;
+		if (showBtn && !existingBtn) {
 			const btn = el.createEl("button", { cls: "ss-expandbtn", text: "+", attr: { title: "Open note" } });
 			this.view.registerDomEvent(btn, "click", (e: MouseEvent) => {
 				e.stopPropagation();
-				this.view.openFocusCard();
+				this.view.openFocusCard(id);
 			});
-		} else if (pos.role !== "current" && existingBtn) {
+		} else if (!showBtn && existingBtn) {
 			existingBtn.remove();
 		}
 

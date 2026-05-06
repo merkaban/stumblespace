@@ -289,9 +289,11 @@ export class StumblespaceView extends ItemView {
 		});
 	}
 
-	openFocusCard(): void {
-		if (this.activeFocusCard || !this.state.currentId) return;
-		const card = new FocusCard(this, this.state.currentId);
+	openFocusCard(id?: string): void {
+		if (this.activeFocusCard) return;
+		const target = id ?? this.state.kbFocus ?? this.state.currentId;
+		if (!target) return;
+		const card = new FocusCard(this, target);
 		this.activeFocusCard = card;
 		this.addChild(card);
 		void card.open();
