@@ -1,5 +1,6 @@
 import { App, TFile } from "obsidian";
 import {
+	extractSourceText,
 	fzAncestors,
 	fzParent,
 	parseIdFromFilename,
@@ -7,7 +8,7 @@ import {
 } from "./folgezettel";
 import { isFolgezettelRelative, type Dir, type Reference } from "./semantics";
 
-export { parseIdFromFilename, parseIdFromLinkText };
+export { parseIdFromFilename, parseIdFromLinkText, extractSourceText };
 
 export class VaultIndex {
 	byId = new Map<string, TFile>();
@@ -82,11 +83,9 @@ export class VaultIndex {
 		}
 		const out: string[] = [];
 		for (const entry of sources) {
-			if (typeof entry !== "string") continue;
-			// Extract basename from wikilink: "[[1.1a3 Title]]" → "1.1a3 Title"
-			const match = entry.match(/^\[\[(.+?)]]$/);
-			if (!match) continue;
-			const linkedId = parseIdFromFilename(match[1]!);
+			const linkText = extractSourceText(entry);
+			if (!linkText) continue;
+			const linkedId = parseIdFromFilename(linkText) ?? parseIdFromLinkText(linkText);
 			if (linkedId) out.push(linkedId);
 		}
 		return out;

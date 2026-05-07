@@ -1,27 +1,6 @@
 import { Component, Keymap, MarkdownRenderer, Notice, TFile } from "obsidian";
-import { parseIdFromFilename, parseIdFromLinkText } from "../graph/folgezettel";
+import { parseIdFromFilename, parseIdFromLinkText, extractSourceText } from "../graph/index";
 import type { StumblespaceView } from "../view";
-
-const SOURCE_RE = /^\[\[(.+?)]]$/;
-
-/** Extract link text from a frontmatter source entry — accepts string or {link} object. */
-function extractSourceText(entry: unknown): string | null {
-	if (typeof entry === "string") {
-		const m = entry.match(SOURCE_RE);
-		return m ? m[1]! : entry;
-	}
-	if (entry && typeof entry === "object") {
-		const obj = entry as Record<string, unknown>;
-		for (const k of ["link", "path", "id", "original"]) {
-			const v = obj[k];
-			if (typeof v === "string") {
-				const m = v.match(SOURCE_RE);
-				return m ? m[1]! : v;
-			}
-		}
-	}
-	return null;
-}
 
 export class FocusCard extends Component {
 	private view: StumblespaceView;

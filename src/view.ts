@@ -1,4 +1,4 @@
-import { ItemView, Keymap, Notice, WorkspaceLeaf, normalizePath } from "obsidian";
+import { ItemView, Keymap, Notice, WorkspaceLeaf, normalizePath, type ViewStateResult } from "obsidian";
 import { layout, type PositionMap } from "./layout";
 import { CanvasRenderer } from "./render";
 import { attachKeyboardHandler } from "./ui/keyboard";
@@ -38,6 +38,22 @@ export class StumblespaceView extends ItemView {
 	getViewType(): string { return VIEW_TYPE; }
 	getDisplayText(): string { return "Stumblespace"; }
 	getIcon(): string { return "network"; }
+
+	getState(): Record<string, unknown> {
+		return { currentId: this.state.currentId };
+	}
+
+	async setState(state: unknown, result: ViewStateResult): Promise<void> {
+		if (state && typeof state === "object" && "currentId" in state) {
+			const id = (state as Record<string, unknown>).currentId;
+			if (typeof id === "string") {
+				this.state.currentId = id;
+				this.state.kbFocus = id;
+			}
+		}
+		await super.setState(state, result);
+		this.queueRender();
+	}
 
 	getIndex(): VaultIndex { return this.plugin.index; }
 
