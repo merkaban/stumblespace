@@ -258,7 +258,7 @@ Replace prototype patterns with Obsidian-compliant equivalents (see Section 7 fo
 - ESLint with `eslint-plugin-obsidianmd` reports zero `innerHTML` violations.
 - Reduced-motion users see no transition.
 
-### M3 — Live data wiring
+### M3 — Live data wiring ✅
 
 **Tasks**
 - Subscribe view to `metadataCache.changed`. On change of any visible file (current, ancestor, sibling, child, neighbor), or on `resolved` events: re-run layout, diff visible-set, animate.
@@ -275,7 +275,7 @@ Replace prototype patterns with Obsidian-compliant equivalents (see Section 7 fo
 - Open a file with no Folgezettel prefix → empty splash appears.
 - Cmd+click on a halo node opens the file in a new tab while leaving the canvas centered where it was.
 
-### M4 — Focus card with real Markdown rendering
+### M4 — Focus card with real Markdown rendering ✅
 
 **Tasks**
 - `ui/focusCard.ts` exports `openFocusCard(view, id)`. Build the card with DOM API only — no `innerHTML` even for the structural template.
@@ -301,7 +301,7 @@ Replace prototype patterns with Obsidian-compliant equivalents (see Section 7 fo
 - Sources list shows `sources:` frontmatter entries, each clickable to recenter.
 - Closing via Esc, scrim, or × all leave no leaked DOM and no leaked event listeners.
 
-### M5 — Settings tab
+### M5 — Settings tab ✅
 
 **Tasks**
 - `settings/schema.ts` defines `ZSCSettings` and `DEFAULT_SETTINGS`.

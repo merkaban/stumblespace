@@ -34,8 +34,9 @@ export function nearestInDirection(
 
 export function attachKeyboardHandler(view: StumblespaceView, container: HTMLElement): void {
 	view.registerDomEvent(container, "keydown", (e: KeyboardEvent) => {
-		const tag = (e.target as HTMLElement)?.tagName ?? "";
-		if (tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement)?.isContentEditable) return;
+		if (!(e.target instanceof HTMLElement)) return;
+		const tag = e.target.tagName;
+		if (tag === "INPUT" || tag === "TEXTAREA" || e.target.isContentEditable) return;
 
 		if (e.key === "Escape") {
 			view.closeFocusCard();
