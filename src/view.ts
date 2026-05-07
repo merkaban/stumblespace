@@ -290,7 +290,9 @@ export class StumblespaceView extends ItemView {
 		if (!this.plugin.settings.openCenteredNoteInEditor) return;
 		const file = this.plugin.index.getNote(id);
 		if (!file) return;
-		void this.app.workspace.openLinkText(file.path, "", false);
+		void this.app.workspace.openLinkText(file.path, "", false).then(() => {
+			this.contentEl.focus({ preventScroll: true });
+		});
 	}
 
 	private persistLastViewed(id: string): void {

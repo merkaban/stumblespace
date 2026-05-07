@@ -1,6 +1,6 @@
 {
 	"name": "stumblespace",
-	"version": "0.10.0",
+	"version": "0.11.0",
 	"description": "A spatial canvas that visualizes Folgezettel relationships and semantic references.",
 	"main": "main.js",
 	"scripts": {

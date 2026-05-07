@@ -71,5 +71,8 @@ export default class StumblespacePlugin extends Plugin {
 		}
 
 		await workspace.revealLeaf(leaf);
+		if (leaf.view instanceof StumblespaceView) {
+			leaf.view.contentEl.focus({ preventScroll: true });
+		}
 	}
 }
