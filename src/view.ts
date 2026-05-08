@@ -190,6 +190,7 @@ export class StumblespaceView extends ItemView {
 			references: index.getReferences(id),
 			settings: this.plugin.settings,
 			canvasWidthPx: this.canvasEl.clientWidth,
+			canvasHeightPx: this.canvasEl.clientHeight,
 		});
 
 		this.state.lastPositions = positions;

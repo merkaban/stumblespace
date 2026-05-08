@@ -29,12 +29,14 @@ interface LayoutInput {
 	 * overlap when the canvas can't fit them side-by-side. Falls back to 1000
 	 * for tests / first paint before measurement. */
 	canvasWidthPx?: number;
+	canvasHeightPx?: number;
 }
 
 const ARCS: [number, number][] = [[195, 265], [275, 345]];
 const DIR_ORDER: Record<Dir, number> = { out: 0, mutual: 1, in: 2 };
 
 const NODE_WIDTH_PX = 180;
+const NODE_HEIGHT_PX = 48;
 const NODE_GAP_PX = 12;
 const EDGE_PAD_PX = 12;
 
@@ -88,9 +90,11 @@ export function layout(input: LayoutInput): PositionMap {
 	// Cap visible at 4: if more exist, show first 3 + a synthetic "+N more"
 	// indicator at slot 4. Synthetic id format: "<kidId>__more".
 	if (kidCount <= 2) {
-		const baseY = 80;
-		const rowSpacing = 6;
-		const MAX_VISIBLE = 4;
+		const baseY = 76;
+		const canvasH = input.canvasHeightPx && input.canvasHeightPx > 0 ? input.canvasHeightPx : 700;
+		const rowSpacing = ((NODE_HEIGHT_PX + NODE_GAP_PX) / canvasH) * 100;
+		const maxSlots = Math.max(1, Math.floor((96 - baseY) / rowSpacing) + 1);
+		const MAX_VISIBLE = Math.min(4, maxSlots);
 		for (const kid of kids) {
 			const gks = input.grandchildrenByKid.get(kid) ?? [];
 			const kidPos = pos.get(kid);

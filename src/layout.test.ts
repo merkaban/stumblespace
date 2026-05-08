@@ -78,10 +78,11 @@ describe("layout", () => {
 			...baseInput,
 			children: ["1.1a3a", "1.1a3b"],
 			grandchildrenByKid: new Map([["1.1a3a", ["1.1a3a1"]]]),
+			canvasHeightPx: 600,
 		};
 		const pos = layout(input);
 		expect(pos.get("1.1a3a1")?.role).toBe("grandchild");
-		expect(pos.get("1.1a3a1")?.y).toBe(80);
+		expect(pos.get("1.1a3a1")?.y).toBe(76);
 	});
 
 	it("stacks grandchildren vertically under their kid with fixed gap", () => {
@@ -91,6 +92,7 @@ describe("layout", () => {
 			grandchildrenByKid: new Map([
 				["1.1a3a", ["1.1a3a1", "1.1a3a2", "1.1a3a3", "1.1a3a4"]],
 			]),
+			canvasHeightPx: 1200,
 		};
 		const pos = layout(input);
 		const kidX = pos.get("1.1a3a")!.x;
@@ -98,11 +100,11 @@ describe("layout", () => {
 		for (const id of ["1.1a3a1", "1.1a3a2", "1.1a3a3", "1.1a3a4"]) {
 			expect(pos.get(id)?.x).toBe(kidX);
 		}
-		// y values increase by exactly 6 each — fixed gap.
-		expect(pos.get("1.1a3a1")?.y).toBe(80);
-		expect(pos.get("1.1a3a2")?.y).toBe(86);
-		expect(pos.get("1.1a3a3")?.y).toBe(92);
-		expect(pos.get("1.1a3a4")?.y).toBe(98);
+		// y values increase by 5 each — (48+12)/1200*100.
+		expect(pos.get("1.1a3a1")?.y).toBe(76);
+		expect(pos.get("1.1a3a2")?.y).toBe(81);
+		expect(pos.get("1.1a3a3")?.y).toBe(86);
+		expect(pos.get("1.1a3a4")?.y).toBe(91);
 	});
 
 	it("caps grandchildren at 4 with a +N more indicator when more exist", () => {
@@ -112,6 +114,7 @@ describe("layout", () => {
 			grandchildrenByKid: new Map([
 				["1.1a3a", ["g1", "g2", "g3", "g4", "g5", "g6"]],
 			]),
+			canvasHeightPx: 1200,
 		};
 		const pos = layout(input);
 		// First 3 visible as real grandchildren.
@@ -122,10 +125,10 @@ describe("layout", () => {
 		expect(pos.has("g4")).toBe(false);
 		expect(pos.has("g5")).toBe(false);
 		expect(pos.has("g6")).toBe(false);
-		// Indicator at slot 4 (y=98) with moreCount = 4 (g3..g6 hidden? actually visible=3, hidden=3+).
+		// Indicator at slot 4 (y = baseY + 3*spacing = 76+15 = 91) with moreCount.
 		const more = pos.get("1.1a3a__more");
 		expect(more).toBeDefined();
-		expect(more?.y).toBe(98);
+		expect(more?.y).toBe(91);
 		expect(more?.moreCount).toBe(3);
 	});
 
